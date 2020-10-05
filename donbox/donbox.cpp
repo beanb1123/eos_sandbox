@@ -16,6 +16,10 @@ const uint64_t MIN_WITHDRAWAL = 1000;
 class [[eosio::contract("donbox")]] donbox : public eosio::contract{       
     
     const uint64_t _threshold;
+    const map<eosio::symbol, eosio::name> _currencies = {
+      {{"EOS", 4}, "eosio.token"_n},
+      {{"SYS", 4}, "eosio.token"_n}
+    };
 
     struct [[eosio::table]] record {
         eosio::name username;
@@ -32,10 +36,14 @@ public:
       , _threshold(MIN_WITHDRAWAL)
     {}
 
-    [[eosio::on_notify("eosio.token::transfer")]]   // called when transfer happens
+    [[eosio::on_notify("*::transfer")]]   // called when transfer happens
     void donation_in(eosio::name& from, eosio::name& to, eosio::asset& sum, string& memo ){
       
       if(from == get_self()) return;  //if it's a withdrawal
+
+      const auto contrit = _currencies.find(sum.symbol);
+      check(contrit != _currencies.end(), "This currency is not accepted");
+      check(get_first_receiver()==contrit->second, "Wrong token contract");
 
       //memo = account name donation is for
       check(memo.length()<13, "Specify donation receiver in the memo and try again");
