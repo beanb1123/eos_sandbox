@@ -1,10 +1,13 @@
 #include <eosio/eosio.hpp>
 #include <eosio/asset.hpp>
 #include <eosio/print.hpp>
-//#include <eosio.token/eosio.token.hpp>
+#include <math.h>
+#include "include/eosio.token.hpp"
 
 using namespace eosio;
 using namespace std;
+
+const uint64_t MIN_WITHDRAWAL = 1000;
 
 
 //holds donation balance and allows donation withdrawal when there is more than threshold SYS
@@ -13,23 +16,20 @@ using namespace std;
 class [[eosio::contract("donbox")]] donbox : public eosio::contract{       
     
     const uint64_t _threshold;
-    const eosio::symbol _symbol;
 
-    struct [[eosio::table]] balance {
+    struct [[eosio::table]] record {
         eosio::name username;
         uint32_t donors;
-        eosio::asset funds;
-        //uint64_t primary_key() const { return username.value;} 
-        uint64_t primary_key() const { return funds.symbol.code().raw(); }
+        std::map<eosio::symbol_code, eosio::asset>  funds;
+        uint64_t primary_key() const { return username.value;} 
     };
 
-    typedef eosio::multi_index< "balances"_n, balance > balances;
+    typedef eosio::multi_index< "balances"_n, record > balances;
 
 public:
-    donbox(eosio::name receiver, eosio::name code, datastream<const char*> ds) 
-      : contract(receiver, code, ds)
-      , _symbol("SYS", 4)
-      , _threshold(2000)
+    donbox(eosio::name rec, eosio::name code, datastream<const char*> ds) 
+      : contract(rec, code, ds)
+      , _threshold(MIN_WITHDRAWAL)
     {}
 
     [[eosio::on_notify("eosio.token::transfer")]]   // called when transfer happens
@@ -37,60 +37,80 @@ public:
       
       if(from == get_self()) return;  //if it's a withdrawal
 
-      check(sum.symbol == _symbol, "Too bad. We can only hold " + _symbol.code().to_string());
-      
       //memo = account name donation is for
       check(memo.length()<13, "Specify donation receiver in the memo and try again");
 
       name receiver(memo);
       check(is_account(receiver), "Memo should contain the donation receiver. No such user: " + memo);
 
-      auto sym_code_raw = _symbol.code().raw();
-      balances balance(get_self(), receiver.value);  
-      auto it = balance.find(sym_code_raw);
+      balances balance(get_self(), get_self().value);  
+      auto it = balance.find(receiver.value);
 
       if (it != balance.end()){
+        
         balance.modify(it, get_self(), [&](auto &row) {
-          row.funds += sum;
+          if(row.funds.count(sum.symbol.code()))
+            row.funds[sum.symbol.code()] += sum;
+          else
+            row.funds[sum.symbol.code()] = sum;
           row.donors++;
         });
       }
       else {
         balance.emplace(get_self(), [&](auto &row) {
           row.username = receiver;
-          row.funds = sum;
+          row.funds[sum.symbol.code()] = sum;
           row.donors = 1;
         });
       }
 
     }
+    [[eosio::action]]
+    void deletedata(){
 
+      require_auth(_self);
+      balances tab(_self, get_self().value);
+      auto itr = tab.begin();
+      while(itr != tab.end()){
+          itr = tab.erase(itr);
+      }
+    }
     [[eosio::action]]
     void withdraw(eosio::name user){
 
       require_auth(user);
 
-      balances balance(get_self(), user.value);    
+      balances balance(get_self(), get_self().value);    
     
-      auto it = balance.find(_symbol.code().raw()); 
-      check(it != balance.end(), "You don't have any donations, sorry");
-      check(it->funds.amount/10000 >= _threshold, "Minimum withdrawal: " + to_string(_threshold) + ". You only have " + it->funds.to_string());
-      //check(false, "Available: "+to_string(it->funds.amount)+", Threshold: "+ to_string(_threshold));
+      const auto& rec = balance.get(user.value, "You don't have any donations, sorry");
+
+      vector<asset> to_transfer;
+      for(auto& p: rec.funds){
+        if(p.second.amount/pow(10, p.second.symbol.precision()) >= _threshold)
+          to_transfer.push_back(p.second);
+      }
+
+      check(to_transfer.size(), "Nothing to witdraw. Must have at least " + to_string(_threshold) + " of any tokens");
       
-      print("Transferring ", it->funds.to_string(), " to ", user);
-    
-      action{
-        permission_level{get_self(), "active"_n},
-        "eosio.token"_n,
-        "transfer"_n,
-        std::make_tuple(get_self(), user, it->funds, it->funds.to_string()+" from "+to_string(it->donors)+" donor(s)")
-      }.send();
-  
- /*
-      using transfer_action = eosio::action_wrapper<"transfer"_n, &transfer>;
-      transfer_action transfer( get_contract( get_self(), quantity.symbol.code() ), { get_self(), "active"_n });
-      transfer.send( get_self(), to, quantity, memo );
-  */    
-      balance.erase(it);
+      eosio::token::transfer_action transfer("eosio.token"_n, { get_self(), "active"_n });
+      for(auto& tokens: to_transfer){
+      
+        print("Transferring ", tokens.to_string(), " to ", user, "\n");
+        transfer.send( get_self(), user, tokens, tokens.to_string()+" from "+to_string(rec.donors)+" donor(s)");
+        
+        /*  //another way to action
+          action{
+            permission_level{get_self(), "active"_n},
+            "eosio.token"_n,
+            "transfer"_n,
+            std::make_tuple(get_self(), user, tokens, tokens.to_string()+" from "+to_string(rec.donors)+" donor(s)")
+          }.send();
+        */
+        balance.modify(rec, get_self(), [&](auto &row) {
+          row.funds.erase(tokens.symbol.code());
+        });
+
+      }
+
     }
 };
