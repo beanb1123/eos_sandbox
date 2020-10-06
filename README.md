@@ -10,3 +10,12 @@ Learning EOS smart contracts
   `cleos push action eosio.token transfer '["alice", "donbox", "1000.0000 SYS", "bob"]' -p alice`
   
   `cleos push action donbox withdraw '["bob"]' -p bob`
+
+* ### loaner
+  Contract that makes use of [sx.flash](https://github.com/stableex/sx.flash) instant loan functionality. 
+
+  Contract has 2 actions:
+  
+  * `loan(asset tokens)` - loan `tokens` from flash.sx contract and repay back immediately
+
+  *  `loancallback(name to, asset tokens)` - loan `tokens` from flash.sx paid to `to` donbox account, then withdraw from donbox and repay to flash.sx
