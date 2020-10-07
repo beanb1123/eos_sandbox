@@ -5,6 +5,7 @@
 #include <eosio.token.hpp>
 #include <defibox.hpp>
 #include <uniswap.hpp>
+#include <registry.sx.hpp>
 
 
 using namespace eosio;
@@ -17,17 +18,26 @@ public:
       : contract(rec, code, ds)
     {};
 
-    map<eosio::symbol, pair<eosio::name, uint64_t>> _tcontracts = {
-      {{"EOS", 4}, {"eosio.token"_n, 12}},
-      {{"USDT", 4}, {"tethertether"_n, 12}}
-    };
-
     [[eosio::action]]
-    void trade(eosio::asset tokens){
+    void trade(eosio::asset tokens, eosio::asset minreturn, std::string exchange){
       
-      check(_tcontracts.count(tokens.symbol), "This currency is not supported");
-    
-      const auto [tcontract, pair_id] = _tcontracts[tokens.symbol];
+      check( tokens.amount > 0 && minreturn.amount > 0, "Invalid tokens amount" );
+      check( exchange=="defibox", "Only defibox is supported right now" );
+
+      registrySx::defibox_table defi_table( "registry.sx"_n, "registry.sx"_n.value );
+      
+      uint64_t pair_id = 0;
+      name tcontract;
+      for(const auto& row: defi_table){
+        if(row.base.get_symbol() == tokens.symbol){
+          check( row.pair_ids.count(minreturn.symbol.code()), "Target currency is not supported" );
+          pair_id = row.pair_ids.at(minreturn.symbol.code());
+          tcontract = row.base.get_contract();
+          break;
+        }
+      }
+
+      check( pair_id > 0, "This pair is not supported");
       
       // get reserves
       const auto [ reserve_in, reserve_out ] = defibox::get_reserves( pair_id, tokens.symbol );
@@ -36,9 +46,10 @@ public:
       print( reserve_in );
       print( reserve_out );  
 
-      // calculate out price      // calculate out price
+      // calculate out price  
       const asset out = uniswap::get_amount_out( tokens, reserve_in, reserve_out, fee );
 
+      check(minreturn <= out, "Return is not enough");
       
       // log out price
       log_action log( get_self(), { get_self(), "active"_n });
