@@ -4,6 +4,8 @@
 
 #include <eosio.token.hpp>
 #include <defibox.hpp>
+#include <uniswap.hpp>
+
 
 using namespace eosio;
 using namespace std;
@@ -28,12 +30,15 @@ public:
       const auto [tcontract, pair_id] = _tcontracts[tokens.symbol];
       
       // get reserves
-      const auto [ reserveIn, reserveOut ] = defibox::getReserves( pair_id, tokens.symbol );
-      print( reserveIn );
-      print( reserveOut );  
+      const auto [ reserve_in, reserve_out ] = defibox::get_reserves( pair_id, tokens.symbol );
+      const uint8_t fee = defibox::get_fee();
 
-      // calculate out price
-      const asset out = defibox::getAmountOut( tokens, reserveIn, reserveOut );
+      print( reserve_in );
+      print( reserve_out );  
+
+      // calculate out price      // calculate out price
+      const asset out = uniswap::get_amount_out( tokens, reserve_in, reserve_out, fee );
+
       
       // log out price
       log_action log( get_self(), { get_self(), "active"_n });
