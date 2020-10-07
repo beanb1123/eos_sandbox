@@ -14,8 +14,15 @@ Learning EOS smart contracts
 * ### loaner
   Contract that makes use of [sx.flash](https://github.com/stableex/sx.flash) instant loan functionality. 
 
-  Contract has 2 actions:
+  Contract has 2 actions
   
   * `loan(asset tokens)` - loan `tokens` from flash.sx contract and repay back immediately
 
   *  `loancallback(name to, asset tokens)` - loan `tokens` from flash.sx paid to `to` donbox account, then withdraw from donbox and repay to flash.sx
+   
+
+* ### trader
+  Makes swap trade with defibox.
+  
+  Contract has 1 action:
+  * `trade(asset tokens)` - trade tokens to `defi` and log calculated return
