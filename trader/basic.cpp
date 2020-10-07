@@ -6,6 +6,7 @@
 #include <defibox.hpp>
 #include <uniswap.hpp>
 #include <registry.sx.hpp>
+#include <dfs.hpp>
 
 
 using namespace eosio;
@@ -22,16 +23,52 @@ public:
     void trade(eosio::asset tokens, eosio::asset minreturn, std::string exchange){
       
       check( tokens.amount > 0 && minreturn.amount > 0, "Invalid tokens amount" );
-      check( exchange=="defibox", "Only defibox is supported right now" );
+      
 
-      registrySx::defibox_table defi_table( "registry.sx"_n, "registry.sx"_n.value );
+      auto [dex, out, tcontract, memo] = get_trade(exchange, tokens, minreturn.symbol);
+      
+
+      check(minreturn <= out, "Return is not enough");
+      
+      // log out price
+      log_action log( get_self(), { get_self(), "active"_n });
+      log.send( out );    
+      
+      // make a swap
+      token::transfer_action transfer( tcontract, { get_self(), "active"_n });
+      transfer.send( get_self(), dex, tokens, memo);
+              
+    }
+
+    [[eosio::action]]
+    void log( const asset out )
+    {
+        require_auth( get_self() );
+    }
+
+    using log_action = eosio::action_wrapper<"log"_n, &basic::log>;
+        
+  private:
+    std::tuple<eosio::name, eosio::asset, eosio::name, std::string> get_trade(std::string& exchange, eosio::asset& tokens, eosio::symbol to){
+      
+      check(exchange == "defibox" || exchange == "dfs", exchange + " exchange is not supported");
+
+      if(exchange == "defibox") return get_defi_trade(tokens, to);
+      
+      return get_dfs_trade(tokens, to);
+    }
+
+    
+    std::tuple<eosio::name, eosio::asset, eosio::name, std::string> get_defi_trade(eosio::asset& tokens, eosio::symbol to){
+      
+      sx::registry::defibox_table defi_table( "registry.sx"_n, "registry.sx"_n.value );
       
       uint64_t pair_id = 0;
       name tcontract;
       for(const auto& row: defi_table){
         if(row.base.get_symbol() == tokens.symbol){
-          check( row.pair_ids.count(minreturn.symbol.code()), "Target currency is not supported" );
-          pair_id = row.pair_ids.at(minreturn.symbol.code());
+          check( row.quotes.count(to.code()), "Target currency is not supported" );
+          pair_id = row.quotes.at(to.code());
           tcontract = row.base.get_contract();
           break;
         }
@@ -43,30 +80,37 @@ public:
       const auto [ reserve_in, reserve_out ] = defibox::get_reserves( pair_id, tokens.symbol );
       const uint8_t fee = defibox::get_fee();
 
-      print( reserve_in );
-      print( reserve_out );  
+      // calculate out price  
+      const asset out = uniswap::get_amount_out( tokens, reserve_in, reserve_out, fee );
+      
+      return {"swap.defi"_n, out, tcontract, "swap,0," + to_string((int) pair_id)};
+    }
+
+
+    
+    std::tuple<eosio::name, eosio::asset, eosio::name, std::string> get_dfs_trade(eosio::asset& tokens, eosio::symbol to){
+      sx::registry::dfs_table dfs_table( "registry.sx"_n, "registry.sx"_n.value );
+      
+      uint64_t pair_id = 0;
+      name tcontract;
+      for(const auto& row: dfs_table){
+        if(row.base.get_symbol() == tokens.symbol){
+          check( row.quotes.count(to.code()), "Target currency is not supported" );
+          pair_id = row.quotes.at(to.code());
+          tcontract = row.base.get_contract();
+          break;
+        }
+      }
+
+      check( pair_id > 0, "This pair is not supported");
+      
+      // get reserves
+      const auto [ reserve_in, reserve_out ] = dfs::get_reserves( pair_id, tokens.symbol );
+      const uint8_t fee = dfs::get_fee();
 
       // calculate out price  
       const asset out = uniswap::get_amount_out( tokens, reserve_in, reserve_out, fee );
 
-      check(minreturn <= out, "Return is not enough");
-      
-      // log out price
-      log_action log( get_self(), { get_self(), "active"_n });
-      log.send( out );    
-      
-      // make a swap
-      token::transfer_action transfer( tcontract, { get_self(), "active"_n });
-      transfer.send( get_self(), "swap.defi"_n, tokens, "swap,0," + to_string((int) pair_id) );
-              
+      return {"defisswapcnt"_n, out, tcontract, "swap:" + to_string((int) pair_id)+":0"};
     }
-
-    [[eosio::action]]
-    void log( const asset out )
-    {
-        require_auth( get_self() );
-    }
-
-    using log_action = eosio::action_wrapper<"log"_n, &basic::log>;
-         
 };
