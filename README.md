@@ -24,5 +24,6 @@ Learning EOS smart contracts
 * ### trader
   Makes swap trade with defibox.
   
-  Contract has 1 action:
-  * `trade(asset tokens)` - trade tokens to `defi` and log calculated return
+  Contract has 2 actions:
+  * `trade(asset tokens, asset minreturn, string exchange)` - trade `tokens` to `exchange` with anticipated `minreturn` and log calculated return
+  * `getcommon()` - list EOS-traded tokens that are traded on all available exchanges 
