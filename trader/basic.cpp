@@ -20,6 +20,22 @@ public:
     {};
 
     [[eosio::action]]
+    void getcommon() {
+      auto pairs = get_all_pairs({{"EOS",4}, "eosio.token"_n}); 
+      
+      vector<symbol_code> res;
+      for(auto& p: pairs[0]){
+        for(int i=1; i<pairs.size(); i++){
+          if(pairs[i].count(p.first)==0) break;
+          if(i==pairs.size()-1) res.push_back(p.first);
+        }
+      }
+
+      logvec_action logvec( get_self(), { get_self(), "active"_n });
+      logvec.send( res );    
+    }
+
+    [[eosio::action]]
     void trade(eosio::asset tokens, eosio::asset minreturn, std::string exchange){
       
       check( tokens.amount > 0 && minreturn.amount > 0, "Invalid tokens amount" );
@@ -46,7 +62,14 @@ public:
         require_auth( get_self() );
     }
 
+    [[eosio::action]]
+    void logvec( const vector<symbol_code>& vec )
+    {
+        require_auth( get_self() );
+    }
+
     using log_action = eosio::action_wrapper<"log"_n, &basic::log>;
+    using logvec_action = eosio::action_wrapper<"logvec"_n, &basic::logvec>;
         
   private:
     std::tuple<eosio::name, eosio::asset, eosio::name, std::string> get_trade(std::string& exchange, eosio::asset& tokens, eosio::symbol to){
@@ -112,5 +135,20 @@ public:
       const asset out = uniswap::get_amount_out( tokens, reserve_in, reserve_out, fee );
 
       return {"defisswapcnt"_n, out, tcontract, "swap:" + to_string((int) pair_id)+":0"};
+    }
+
+    std::vector<std::map<symbol_code, uint64_t>> get_all_pairs(extended_symbol sym){
+      vector<map<symbol_code, uint64_t>> res;
+
+      sx::registry::dfs_table dfs_table( "registry.sx"_n, "registry.sx"_n.value );
+      auto dfsrow = dfs_table.get(sym.get_symbol().code().raw(), "DFS doesn't trade this currency");
+      res.push_back(dfsrow.quotes);
+
+      
+      sx::registry::defibox_table defi_table( "registry.sx"_n, "registry.sx"_n.value );
+      auto defirow = defi_table.get(sym.get_symbol().code().raw(), "Defibox doesn't trade this currency");
+      res.push_back(defirow.quotes);
+
+      return res;
     }
 };
