@@ -23,6 +23,7 @@ public:
     void getcommon() {
       auto pairs = get_all_pairs({{"EOS",4}, "eosio.token"_n}); 
       
+      //fetch common symbols into vector
       vector<symbol_code> common;
       for(auto& p: pairs[0]){
         for(int i=1; i<pairs.size(); i++){
@@ -30,7 +31,20 @@ public:
           if(i==pairs.size()-1) common.push_back(p.first);
         }
       }
+      //dump all prices into map of strings and log
+      map<symbol_code, string> prices;
+      asset tokens{10*10000, {"EOS", 4}};
+      for(auto sym: common){
+        for(auto& dex: {"defibox", "dfs"}){
+          auto [ex, out, tcontract, memo] = get_trade(dex, tokens, sym);
+          prices[sym] += (string(dex) + ": " + out.to_string() + "; ");
+        }
+      }
       
+      logcommon_action logcommon( get_self(), { get_self(), "active"_n });
+      logcommon.send( prices ); 
+/*
+      //get best prices for common symbols into map
       map<symbol_code, asset> best_prices;
       asset tokens{10*10000, {"EOS", 4}};
       for(auto sym: common){
@@ -42,8 +56,11 @@ public:
             best_prices[sym] = out;
         }
       }
-      logcommon_action logcommon( get_self(), { get_self(), "active"_n });
-      logcommon.send( best_prices );    
+
+      //just log the result
+      logbestcomm_action logbestcomm( get_self(), { get_self(), "active"_n });
+      logbestcomm.send( best_prices );  
+      */  
     }
 
     [[eosio::action]]
@@ -74,12 +91,19 @@ public:
     }
 
     [[eosio::action]]
-    void logcommon( const map<symbol_code, asset>& prices )
+    void logbestcomm( const map<symbol_code, asset>& prices )
+    {
+        require_auth( get_self() );
+    }
+
+    [[eosio::action]]
+    void logcommon( const map<symbol_code, string>& prices )
     {
         require_auth( get_self() );
     }
 
     using log_action = eosio::action_wrapper<"log"_n, &basic::log>;
+    using logbestcomm_action = eosio::action_wrapper<"logbestcomm"_n, &basic::logbestcomm>;
     using logcommon_action = eosio::action_wrapper<"logcommon"_n, &basic::logcommon>;
         
   private:
