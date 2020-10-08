@@ -23,16 +23,27 @@ public:
     void getcommon() {
       auto pairs = get_all_pairs({{"EOS",4}, "eosio.token"_n}); 
       
-      vector<symbol_code> res;
+      vector<symbol_code> common;
       for(auto& p: pairs[0]){
         for(int i=1; i<pairs.size(); i++){
           if(pairs[i].count(p.first)==0) break;
-          if(i==pairs.size()-1) res.push_back(p.first);
+          if(i==pairs.size()-1) common.push_back(p.first);
         }
       }
-
-      logvec_action logvec( get_self(), { get_self(), "active"_n });
-      logvec.send( res );    
+      
+      map<symbol_code, asset> best_prices;
+      asset tokens{10*10000, {"EOS", 4}};
+      for(auto sym: common){
+        for(auto& dex: {"defibox", "dfs"}){
+          auto [ex, out, tcontract, memo] = get_trade(dex, tokens, sym);
+          if(best_prices.count(sym))
+            best_prices[sym] = min(best_prices[sym], out);
+          else
+            best_prices[sym] = out;
+        }
+      }
+      logcommon_action logcommon( get_self(), { get_self(), "active"_n });
+      logcommon.send( best_prices );    
     }
 
     [[eosio::action]]
@@ -41,7 +52,7 @@ public:
       check( tokens.amount > 0 && minreturn.amount > 0, "Invalid tokens amount" );
       
 
-      auto [dex, out, tcontract, memo] = get_trade(exchange, tokens, minreturn.symbol);
+      auto [dex, out, tcontract, memo] = get_trade(exchange, tokens, minreturn.symbol.code());
       
 
       check(minreturn <= out, "Return is not enough");
@@ -57,22 +68,22 @@ public:
     }
 
     [[eosio::action]]
-    void log( const asset out )
+    void log( asset& out )
     {
         require_auth( get_self() );
     }
 
     [[eosio::action]]
-    void logvec( const vector<symbol_code>& vec )
+    void logcommon( const map<symbol_code, asset>& prices )
     {
         require_auth( get_self() );
     }
 
     using log_action = eosio::action_wrapper<"log"_n, &basic::log>;
-    using logvec_action = eosio::action_wrapper<"logvec"_n, &basic::logvec>;
+    using logcommon_action = eosio::action_wrapper<"logcommon"_n, &basic::logcommon>;
         
   private:
-    std::tuple<eosio::name, eosio::asset, eosio::name, std::string> get_trade(std::string& exchange, eosio::asset& tokens, eosio::symbol to){
+    std::tuple<eosio::name, eosio::asset, eosio::name, std::string> get_trade(std::string exchange, eosio::asset& tokens, eosio::symbol_code to){
       
       check(exchange == "defibox" || exchange == "dfs", exchange + " exchange is not supported");
 
@@ -82,7 +93,7 @@ public:
     }
 
     
-    std::tuple<eosio::name, eosio::asset, eosio::name, std::string> get_defi_trade(eosio::asset& tokens, eosio::symbol to){
+    std::tuple<eosio::name, eosio::asset, eosio::name, std::string> get_defi_trade(eosio::asset& tokens, eosio::symbol_code to){
       
       sx::registry::defibox_table defi_table( "registry.sx"_n, "registry.sx"_n.value );
       
@@ -90,8 +101,8 @@ public:
       name tcontract;
       for(const auto& row: defi_table){
         if(row.base.get_symbol() == tokens.symbol){
-          check( row.quotes.count(to.code()), "Target currency is not supported" );
-          pair_id = row.quotes.at(to.code());
+          check( row.quotes.count(to), "Target currency is not supported" );
+          pair_id = row.quotes.at(to);
           tcontract = row.base.get_contract();
           break;
         }
@@ -111,15 +122,15 @@ public:
 
 
     
-    std::tuple<eosio::name, eosio::asset, eosio::name, std::string> get_dfs_trade(eosio::asset& tokens, eosio::symbol to){
+    std::tuple<eosio::name, eosio::asset, eosio::name, std::string> get_dfs_trade(eosio::asset& tokens, eosio::symbol_code to){
       sx::registry::dfs_table dfs_table( "registry.sx"_n, "registry.sx"_n.value );
       
       uint64_t pair_id = 0;
       name tcontract;
       for(const auto& row: dfs_table){
         if(row.base.get_symbol() == tokens.symbol){
-          check( row.quotes.count(to.code()), "Target currency is not supported" );
-          pair_id = row.quotes.at(to.code());
+          check( row.quotes.count(to), "Target currency is not supported" );
+          pair_id = row.quotes.at(to);
           tcontract = row.base.get_contract();
           break;
         }
