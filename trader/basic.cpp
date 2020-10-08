@@ -20,7 +20,7 @@ public:
     {};
 
     [[eosio::action]]
-    void getcommon() {
+    void getgains(eosio::asset eos_tokens) {
       auto pairs = get_all_pairs({{"EOS",4}, "eosio.token"_n}); 
       
       //fetch common symbols into vector
@@ -31,36 +31,29 @@ public:
           if(i==pairs.size()-1) common.push_back(p.first);
         }
       }
-      //dump all prices into map of strings and log
-      map<symbol_code, string> prices;
-      asset tokens{10*10000, {"EOS", 4}};
-      for(auto sym: common){
+
+      //for common symbols build a map {BOX->{{0.1234 BOX,"defi"},{0.1345 BOX, "dfs"}},...}
+      map<symbol_code, map<asset, string>> prices;  
+      for(auto& sym: common){
         for(auto& dex: {"defibox", "dfs"}){
-          auto [ex, out, tcontract, memo] = get_trade(dex, tokens, sym);
-          prices[sym] += (string(dex) + ": " + out.to_string() + "; ");
-        }
-      }
-      
-      logcommon_action logcommon( get_self(), { get_self(), "active"_n });
-      logcommon.send( prices ); 
-/*
-      //get best prices for common symbols into map
-      map<symbol_code, asset> best_prices;
-      asset tokens{10*10000, {"EOS", 4}};
-      for(auto sym: common){
-        for(auto& dex: {"defibox", "dfs"}){
-          auto [ex, out, tcontract, memo] = get_trade(dex, tokens, sym);
-          if(best_prices.count(sym))
-            best_prices[sym] = min(best_prices[sym], out);
-          else
-            best_prices[sym] = out;
+          auto [ex, out, tcontract, memo] = get_trade_data(dex, eos_tokens, sym);
+          prices[sym][out] = dex;
         }
       }
 
-      //just log the result
-      logbestcomm_action logbestcomm( get_self(), { get_self(), "active"_n });
-      logbestcomm.send( best_prices );  
-      */  
+      //calculate best gains for each symbol
+      map<symbol_code, asset> gains;
+      for(auto& sym: common){
+        auto sellit = prices[sym].rbegin(); //highest return for this symbol (best to sell)
+        auto buyit = prices[sym].begin();   //lowest return (best to buy)
+        auto [ex, out, tcontract, memo] = get_trade_data(buyit->second, sellit->first, eos_tokens.symbol.code());
+        gains[sym] = out - eos_tokens;
+        print(sym.to_string() + ": " + sellit->second + "("+sellit->first.to_string()+ ")->" 
+                    + buyit->second + "("+out.to_string() +"@" + buyit->first.to_string()+ ") =" + gains[sym].to_string() + "\n");
+      }
+      logsymass_action logsymass( get_self(), { get_self(), "active"_n });
+      logsymass.send(eos_tokens, gains ); 
+
     }
 
     [[eosio::action]]
@@ -69,10 +62,10 @@ public:
       check( tokens.amount > 0 && minreturn.amount > 0, "Invalid tokens amount" );
       
 
-      auto [dex, out, tcontract, memo] = get_trade(exchange, tokens, minreturn.symbol.code());
+      auto [dex, out, tcontract, memo] = get_trade_data(exchange, tokens, minreturn.symbol.code());
       
 
-      check(minreturn <= out, "Return is not enough");
+      check(minreturn <= out || minreturn.amount==0, "Return is not enough");
       
       // log out price
       log_action log( get_self(), { get_self(), "active"_n });
@@ -91,33 +84,33 @@ public:
     }
 
     [[eosio::action]]
-    void logbestcomm( const map<symbol_code, asset>& prices )
+    void logsymass( const asset& from, const map<symbol_code, asset>& gains )
     {
         require_auth( get_self() );
     }
 
     [[eosio::action]]
-    void logcommon( const map<symbol_code, string>& prices )
+    void logsymstr( const map<symbol_code, string>& str )
     {
         require_auth( get_self() );
     }
 
     using log_action = eosio::action_wrapper<"log"_n, &basic::log>;
-    using logbestcomm_action = eosio::action_wrapper<"logbestcomm"_n, &basic::logbestcomm>;
-    using logcommon_action = eosio::action_wrapper<"logcommon"_n, &basic::logcommon>;
+    using logsymass_action = eosio::action_wrapper<"logsymass"_n, &basic::logsymass>;
+    using logsymstr_action = eosio::action_wrapper<"logsymstr"_n, &basic::logsymstr>;
         
   private:
-    std::tuple<eosio::name, eosio::asset, eosio::name, std::string> get_trade(std::string exchange, eosio::asset& tokens, eosio::symbol_code to){
+    std::tuple<eosio::name, eosio::asset, eosio::name, std::string> get_trade_data(std::string exchange, eosio::asset tokens, eosio::symbol_code to){
       
       check(exchange == "defibox" || exchange == "dfs", exchange + " exchange is not supported");
 
-      if(exchange == "defibox") return get_defi_trade(tokens, to);
+      if(exchange == "defibox") return get_defi_trade_data(tokens, to);
       
-      return get_dfs_trade(tokens, to);
+      return get_dfs_trade_data(tokens, to);
     }
 
     
-    std::tuple<eosio::name, eosio::asset, eosio::name, std::string> get_defi_trade(eosio::asset& tokens, eosio::symbol_code to){
+    std::tuple<eosio::name, eosio::asset, eosio::name, std::string> get_defi_trade_data(eosio::asset& tokens, eosio::symbol_code to){
       
       sx::registry::defibox_table defi_table( "registry.sx"_n, "registry.sx"_n.value );
       
@@ -146,7 +139,7 @@ public:
 
 
     
-    std::tuple<eosio::name, eosio::asset, eosio::name, std::string> get_dfs_trade(eosio::asset& tokens, eosio::symbol_code to){
+    std::tuple<eosio::name, eosio::asset, eosio::name, std::string> get_dfs_trade_data(eosio::asset& tokens, eosio::symbol_code to){
       sx::registry::dfs_table dfs_table( "registry.sx"_n, "registry.sx"_n.value );
       
       uint64_t pair_id = 0;
