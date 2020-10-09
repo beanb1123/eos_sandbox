@@ -13,7 +13,7 @@ public:
     
     //find arbitrage opportunity and execute it
     [[eosio::action]]
-void mine(asset eos_tokens);
+    void mine(asset eos_tokens);
 
 
     //trade {tokens} on {exchange} to {minreturn.symbol} currency expecting at least {minreturn} in return
@@ -40,7 +40,15 @@ void mine(asset eos_tokens);
 
 
 private:
-    
+    struct [[eosio::table("tradeplan")]] tradeparams {
+        asset       stake;
+        string        dex_sell;
+        string        dex_buy;
+        symbol_code symbol;
+        asset       calculated_profit;
+    };
+    typedef eosio::singleton< "tradeplan"_n, tradeparams > tradeplan;
+
     //get parameters for trade of {tokens} on {exchange}
     //out: {exchange name, calculated return, token contract name, memo needed for trade}
     tuple<name, asset, name, string> 
@@ -71,4 +79,8 @@ private:
     tuple<asset, symbol_code, string, string> 
     get_best_arb_opportunity(asset eos_tokens);
 
+    //trade {tokens} to {sym} currency on {exchange}
+    //out: expected return
+    asset make_trade(asset tokens, symbol_code sym, string exchange);
+    
 };
