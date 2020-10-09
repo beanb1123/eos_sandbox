@@ -63,16 +63,21 @@ private:
     //out: {exchange name, calculated return, token contract name, memo needed for trade}
     tuple<name, asset, name, string> 
     get_dfs_trade_data(asset tokens, symbol_code to);
+
+    //get parameters for trade of {tokens} on swapsx
+    //out: {exchange name, calculated return, token contract name, memo needed for trade}
+    tuple<name, asset, name, string> 
+    get_swapsx_trade_data(asset tokens, symbol_code to);
     
     //get vector of maps of all pairs we can trade {sym} for based on registry.sx tables
     //out: i.e. {{{USDT->12},{BOX->23},{IQ->43}}, {{USDT->34},{PIZZA->44}}}
-    vector<map<symbol_code, uint64_t>> 
+    map<string, vector<symbol_code>>
     get_all_pairs(extended_symbol sym);
     
     //based on trade pairs {pairs} and base assets {tokens} build map of quotes 
     //out: {symbol -> {out_tokens -> dex},...} 
     map<symbol_code, map<asset, string>> 
-    get_quotes(vector<map<symbol_code, uint64_t>>& pairs, asset tokens);
+    get_quotes(map<string, vector<symbol_code>>& pairs, asset tokens);
     
     //find best arbitrage opportunity based on {eos_tokens} bet
     //out: {possible profit, symbol, dex to sell, dex to buy}

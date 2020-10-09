@@ -6,6 +6,7 @@
 #include <defibox.hpp>
 #include <uniswap.hpp>
 #include <flash.sx.hpp>
+#include <swap.sx.hpp>
 #include <registry.sx.hpp>
 #include <dfs.hpp>
 
@@ -44,7 +45,7 @@ void basic::trade(asset tokens, asset minreturn, string exchange){
 
   auto [dex, out, tcontract, memo] = get_trade_data(exchange, tokens, minreturn.symbol.code());
   
-
+  check(out.amount > 0, "Trade pair not supported");
   check(minreturn <= out || minreturn.amount==0, "Return is not enough");
   
   // log out price
@@ -63,6 +64,7 @@ asset basic::make_trade(asset tokens, symbol_code sym, string exchange){
   
   auto [dex, out, tcontract, memo] = get_trade_data(exchange, tokens, sym);
   
+  check(out.amount > 0, "Trade pair not supported");
   print("Sending "+tokens.to_string()+" to "+dex.to_string()+" to buy "+sym.to_string()+" with memo "+memo+"\n");
 
   // make a trade
@@ -75,11 +77,13 @@ asset basic::make_trade(asset tokens, symbol_code sym, string exchange){
 
 tuple<name, asset, name, string> basic::get_trade_data(string exchange, asset tokens, symbol_code to){
   
-  check(exchange == "defibox" || exchange == "dfs", exchange + " exchange is not supported");
-
   if(exchange == "defibox") return get_defi_trade_data(tokens, to);
+  if(exchange == "dfs") return get_dfs_trade_data(tokens, to);
+  if(exchange == "swapsx") return get_swapsx_trade_data(tokens, to);
   
-  return get_dfs_trade_data(tokens, to);
+  check(false, exchange + " exchange is not supported");
+  return get_dfs_trade_data(tokens, to);  //dummy
+
 }
 
     
@@ -98,7 +102,8 @@ tuple<name, asset, name, string> basic::get_defi_trade_data(asset tokens, symbol
     }
   }
 
-  check( pair_id > 0, "This pair is not supported");
+ if(pair_id == 0)
+    return  {"null"_n, {0, tokens.symbol}, "null"_n, ""};  //This pair is not supported. 
   
   // get reserves
   const auto [ reserve_in, reserve_out ] = defibox::get_reserves( pair_id, tokens.symbol );
@@ -127,7 +132,8 @@ tuple<name, asset, name, string> basic::get_dfs_trade_data(asset tokens, symbol_
     }
   }
 
-  check( pair_id > 0, "This pair is not supported");
+  if(pair_id == 0)
+    return  {"null"_n, {0, tokens.symbol}, "null"_n, ""};  //This pair is not supported. 
   
   // get reserves
   const auto [ reserve_in, reserve_out ] = dfs::get_reserves( pair_id, tokens.symbol );
@@ -139,39 +145,63 @@ tuple<name, asset, name, string> basic::get_dfs_trade_data(asset tokens, symbol_
   return {"defisswapcnt"_n, out, tcontract, "swap:" + to_string((int) pair_id)+":0"};
 }
 
-vector<map<symbol_code, uint64_t>> basic::get_all_pairs(extended_symbol sym){
-  vector<map<symbol_code, uint64_t>> res;
+
+tuple<name, asset, name, string> basic::get_swapsx_trade_data(asset tokens, symbol_code to){
+  
+  swapSx::tokens _tokens( "swap.sx"_n, "swap.sx"_n.value );
+  name tcontract = "null"_n;
+  bool foundto=false;
+  for ( const auto token : _tokens ) {
+    if(token.sym.code()==tokens.symbol.code())    
+      tcontract = token.contract;
+    if(token.sym.code()==to)
+      foundto = true;
+  }
+
+  if(!foundto || tcontract == "null"_n)
+    return  {"null"_n, {0, tokens.symbol}, "null"_n, ""};  //This pair is not supported. 
+  
+  asset out = swapSx::get_amount_out( "swap.sx"_n, tokens, to );
+  
+  return {"swap.sx"_n, out, tcontract, to.to_string()};
+}
+
+map<string, vector<symbol_code>> basic::get_all_pairs(extended_symbol sym){
+  map<string, vector<symbol_code>> res;
 
   sx::registry::dfs_table dfs_table( "registry.sx"_n, "registry.sx"_n.value );
   auto dfsrow = dfs_table.get(sym.get_symbol().code().raw(), "DFS doesn't trade this currency");
-  res.push_back(dfsrow.quotes);
+  for(auto& p: dfsrow.quotes) 
+    res["dfs"].push_back(p.first);
 
   
   sx::registry::defibox_table defi_table( "registry.sx"_n, "registry.sx"_n.value );
   auto defirow = defi_table.get(sym.get_symbol().code().raw(), "Defibox doesn't trade this currency");
-  res.push_back(defirow.quotes);
+  for(auto& p: defirow.quotes) 
+    res["defibox"].push_back(p.first);
+
+  vector<symbol_code> swapv;
+  bool found=false;
+  swapSx::tokens _tokens( "swap.sx"_n, "swap.sx"_n.value );
+  for ( const auto token : _tokens ) {
+      if(token.sym!=sym.get_symbol()) swapv.push_back(token.sym.code());   
+      else found=true;
+  }
+  if(found) res["swapsx"] = swapv;
 
   return res;
 }
     
    
-map<symbol_code, map<asset, string>> basic::get_quotes(vector<map<symbol_code, uint64_t>>& pairs, asset tokens)  {
+map<symbol_code, map<asset, string>> basic::get_quotes(map<string, vector<symbol_code>>& pairs, asset tokens)  {
   
-  //fetch common symbols into vector
-  vector<symbol_code> common;
-  for(auto& p: pairs[0]){
-    for(int i=1; i<pairs.size(); i++){
-      if(pairs[i].count(p.first)==0) break;
-      if(i==pairs.size()-1) common.push_back(p.first);
-    }
-  }
-
   //for common symbols build a map {BOX->{{0.1234 BOX,"defi"},{0.1345 BOX, "dfs"}},...}
   map<symbol_code, map<asset, string>> prices;  
-  for(auto& sym: common){
-    for(auto& dex: {"defibox", "dfs"}){
+  for(auto& p: pairs){
+    auto dex = p.first;
+    for(auto sym: p.second){
       auto [ex, out, tcontract, memo] = get_trade_data(dex, tokens, sym);
-      prices[sym][out] = dex;
+      if(out.amount > 0) prices[sym][out] = dex;
     }
   }
 
@@ -183,19 +213,20 @@ tuple<asset, symbol_code, string, string> basic::get_best_arb_opportunity(asset 
   check(eos_tokens.symbol.code().to_string()=="EOS", "Only EOS is supported as base token at the moment");
 
   auto pairs = get_all_pairs({{"EOS",4}, "eosio.token"_n}); 
-  
   auto quotes = get_quotes(pairs, eos_tokens);
 
+  //check(false, "Quotes: " + to_string(quotes.size()));
   //calculate best profits for each symbol and find the biggest
   tuple<asset, symbol_code, string, string> best;
   asset best_gain{-100*10000, {"EOS",4}};
   for(auto& p: quotes){
+    if(p.second.size()<2) continue;   //pair traded only on one exchange
     auto sym = p.first;
     auto sellit = p.second.rbegin(); //highest return for this symbol (best to sell)
     auto buyit = p.second.begin();   //lowest return (best to buy)
     auto [ex, out, tcontract, memo] = get_trade_data(buyit->second, sellit->first, eos_tokens.symbol.code());
     auto gain = out - eos_tokens;
-    if(gain > best_gain){
+    if(out.amount > 0 && gain > best_gain){
       best_gain = gain;
       best = {gain, sym, sellit->second, buyit->second};
     }
