@@ -22,9 +22,9 @@ void basic::mine(asset eos_tokens) {
 
   auto [profit, sym, dex_sell, dex_buy] = get_best_arb_opportunity(eos_tokens);
   
-  print( "Best profit: " + profit.to_string() + " when trading " + sym.to_string() + " " + dex_sell + "=>" + dex_buy );
+  print( "Best profit: " + profit.to_string() + " EOS<->" + sym.to_string() + " " + dex_sell + "=>" + dex_buy );
   
-  //check( profit.amount > 0, "No arbitrage opportunities");
+  check( profit.amount > 0, "No profits for "+eos_tokens.to_string()+". Closest: " + profit.to_string() + " with " + sym.to_string() + " " + dex_sell + "=>" + dex_buy );
   
   basic::tradeplan _tradeplan( get_self(), get_self().value );
   _tradeplan.set({eos_tokens, dex_sell, dex_buy, sym, profit}, get_self());
