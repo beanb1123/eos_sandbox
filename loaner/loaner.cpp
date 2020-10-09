@@ -7,9 +7,6 @@
 
 #include "../donbox/donbox.hpp"
 
-using namespace eosio;
-using namespace std;
-
 class [[eosio::contract("loaner")]] loaner : public eosio::contract {       
     
 public:
