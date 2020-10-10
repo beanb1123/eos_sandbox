@@ -15,25 +15,12 @@ public:
     [[eosio::action]]
     void mine(asset eos_tokens);
 
-
-    //trade {tokens} on {exchange} to {minreturn.symbol} currency expecting at least {minreturn} in return
-    [[eosio::action]]
-    void trade(asset tokens, asset minreturn, string exchange);
-
-    
     //log asset
     [[eosio::action]]
     void log( asset& out ){
         require_auth( get_self() );
     }
     using log_action = action_wrapper<"log"_n, &basic::log>;
-
-    //log map of {symbol->asset} pairs
-    [[eosio::action]]
-    void logsymass( const asset& from, const map<symbol_code, asset>& gains ){
-        require_auth( get_self() );
-    }
-    using logsymass_action = action_wrapper<"logsymass"_n, &basic::logsymass>;
 
     [[eosio::on_notify("eosio.token::transfer")]]   
     void on_transfer(name& from, name& to, asset& sum, string& memo );

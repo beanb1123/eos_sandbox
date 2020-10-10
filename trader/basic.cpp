@@ -37,27 +37,6 @@ void basic::mine(asset eos_tokens) {
 
 }
 
-[[eosio::action]]
-void basic::trade(asset tokens, asset minreturn, string exchange){
-  
-  check( tokens.amount > 0 && minreturn.amount > 0, "Invalid tokens amount" );
-  
-
-  auto [dex, out, tcontract, memo] = get_trade_data(exchange, tokens, minreturn.symbol.code());
-  
-  check(out.amount > 0, "Trade pair not supported");
-  check(minreturn <= out || minreturn.amount==0, "Return is not enough");
-  
-  // log out price
-  log_action log( get_self(), { get_self(), "active"_n });
-  log.send( out );    
-  
-  // make a swap
-  token::transfer_action transfer( tcontract, { get_self(), "active"_n });
-  transfer.send( get_self(), dex, tokens, memo);
-          
-}
-
 asset basic::make_trade(asset tokens, symbol_code sym, string exchange){
   
   check( tokens.amount > 0, "Invalid tokens amount" );
@@ -265,7 +244,7 @@ void basic::on_transfer(eosio::name& from, eosio::name& to, eosio::asset& sum, s
 
     eosio::token::transfer_action transfer("eosio.token"_n, { get_self(), "active"_n });
     transfer.send( get_self(), "flash.sx"_n, trade.stake, "Repaying the loan");
-    transfer.send( get_self(), "fee.sx"_n, profit, "Arb "+trade.symbol.to_string()+" "+trade.dex_sell+"->"+trade.dex_buy);
+    transfer.send( get_self(), "fee.sx"_n, profit, trade.stake.symbol.code().to_string()+"/"+trade.symbol.to_string()+" "+trade.dex_sell+"->"+trade.dex_buy);
     
     //delete singleton?
 
