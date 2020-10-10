@@ -27,51 +27,53 @@ public:
 
 
 private:
-    struct [[eosio::table("tradeplan")]] tradeparams {
-        asset           stake;
-        string          dex_sell;
-        string          dex_buy;
-        symbol_code     symbol;
-        asset           expected_out;
+    //arbitration parameters to save into singleton
+    struct [[eosio::table("arbplan")]] arbparams {
+        asset           stake;          //our stake we borrow from flash.sx
+        string          dex_sell;       //exchange to sell stake to
+        string          dex_buy;        //exchange to buy from
+        symbol_code     symcode;        //symbol code to arbitrage via
+        asset           exp_profit;     //expected profit from arbitrage
     };
-    typedef eosio::singleton< "tradeplan"_n, tradeparams > tradeplan;
+    typedef eosio::singleton< "arbplan"_n, arbparams > arbplan;
+
+    //trade parameters for trade
+    struct tradeparams {
+        name            dex;        //exchange name
+        asset           out;        //calculated return    
+        name            tcontract;  //token contract for trade
+        string          memo;       //memo to make trade happen
+    };
 
     //get parameters for trade of {tokens} on {exchange}
     //out: {exchange name, calculated return, token contract name, memo needed for trade}
-    tuple<name, asset, name, string> 
-    get_trade_data(string exchange, asset tokens, symbol_code to);
+    tradeparams get_trade_data(string exchange, asset tokens, symbol_code to);
 
     //get parameters for trade of {tokens} on defibox
     //out: {exchange name, calculated return, token contract name, memo needed for trade}
-    tuple<name, asset, name, string> 
-    get_defi_trade_data(asset tokens, symbol_code to);
+    tradeparams get_defi_trade_data(asset tokens, symbol_code to);
     
     //get parameters for trade of {tokens} on dfs
     //out: {exchange name, calculated return, token contract name, memo needed for trade}
-    tuple<name, asset, name, string> 
-    get_dfs_trade_data(asset tokens, symbol_code to);
+    tradeparams get_dfs_trade_data(asset tokens, symbol_code to);
 
     //get parameters for trade of {tokens} on {dex_contract} swap exchange
     //out: {exchange name, calculated return, token contract name, memo needed for trade}
-    tuple<name, asset, name, string> 
-    get_swap_trade_data(name dex_contract, asset tokens, symbol_code to);
+    tradeparams get_swap_trade_data(name dex_contract, asset tokens, symbol_code to);
     
     //get vector of maps of all pairs we can trade {sym} for based on registry.sx tables
     //out: i.e. {defi->{BOX,IQ,BTC},dfs->{PIZZA,BTC,ETH}}
-    map<string, vector<symbol_code>>
-    get_all_pairs(extended_symbol sym);
+    map<string, vector<symbol_code>> get_all_pairs(extended_symbol sym);
     
     //based on trade pairs {pairs} and base assets {tokens} build map of quotes 
     //out: {symbol -> {out_tokens -> dex},...} 
     //i.e. from: {defi->{BOX,IQ,BTC},dfs->{PIZZA,BTC,ETH}}
     //to: {{dfs->{BOX,BTC,ETH},defi->{BTN,IQ,BTC}}} => {BOX->{{0.1234 EOS->dfs},{1.2345 EOS->defi}},{BTC->{{0.123 EOS->dfs},..}}}
-    map<symbol_code, map<asset, string>> 
-    get_quotes(map<string, vector<symbol_code>>& pairs, asset tokens);
+    map<symbol_code, map<asset, string>>  get_quotes(map<string, vector<symbol_code>>& pairs, asset tokens);
     
     //find best arbitrage opportunity based on {eos_tokens} bet
-    //out: {possible profit, symbol, dex to sell, dex to buy}
-    tuple<asset, symbol_code, string, string> 
-    get_best_arb_opportunity(asset eos_tokens);
+    //out: {expected profit, symbol, dex to sell, dex to buy}
+    arbparams get_best_arb_opportunity(asset eos_tokens);
 
     //trade {tokens} to {sym} currency on {exchange}
     //out: expected return

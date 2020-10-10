@@ -21,14 +21,14 @@ void basic::mine(asset eos_tokens) {
   
   if (!has_auth("miner.sx"_n)) require_auth(get_self());
 
-  auto [profit, sym, dex_sell, dex_buy] = get_best_arb_opportunity(eos_tokens);
+  auto arb = get_best_arb_opportunity(eos_tokens);
   
-  print( "Best profit: " + profit.to_string() + " EOS<->" + sym.to_string() + " " + dex_sell + "=>" + dex_buy );
+  print( "Best profit: " + arb.exp_profit.to_string() + " EOS<->" + arb.symcode.to_string() + " " + arb.dex_sell + "=>" + arb.dex_buy );
   
-  check( profit.amount > 0, "No profits for "+eos_tokens.to_string()+". Closest: " + profit.to_string() + " with " + sym.to_string() + " " + dex_sell + "=>" + dex_buy );
+  check( arb.exp_profit.amount > 0, "No profits for "+eos_tokens.to_string()+". Closest: " + arb.exp_profit.to_string() + " with " + arb.symcode.to_string() + " " + arb.dex_sell + "=>" + arb.dex_buy );
   
-  basic::tradeplan _tradeplan( get_self(), get_self().value );
-  _tradeplan.set({eos_tokens, dex_sell, dex_buy, sym, profit}, get_self());
+  basic::arbplan _arbplan( get_self(), get_self().value );
+  _arbplan.set(arb, get_self());
 
   //borrow stake
   flash::borrow_action borrow( "flash.sx"_n, { get_self(), "active"_n });
@@ -54,7 +54,7 @@ asset basic::make_trade(asset tokens, symbol_code sym, string exchange){
 
 }
 
-tuple<name, asset, name, string> basic::get_trade_data(string exchange, asset tokens, symbol_code to){
+basic::tradeparams basic::get_trade_data(string exchange, asset tokens, symbol_code to){
   
   if(exchange == "defibox") 
     return get_defi_trade_data(tokens, to);
@@ -69,7 +69,7 @@ tuple<name, asset, name, string> basic::get_trade_data(string exchange, asset to
 }
 
     
-tuple<name, asset, name, string> basic::get_defi_trade_data(asset tokens, symbol_code to){
+basic::tradeparams basic::get_defi_trade_data(asset tokens, symbol_code to){
   
   sx::registry::defibox_table defi_table( "registry.sx"_n, "registry.sx"_n.value );
   
@@ -99,7 +99,7 @@ tuple<name, asset, name, string> basic::get_defi_trade_data(asset tokens, symbol
 
 
     
-tuple<name, asset, name, string> basic::get_dfs_trade_data(asset tokens, symbol_code to){
+basic::tradeparams basic::get_dfs_trade_data(asset tokens, symbol_code to){
   
   sx::registry::dfs_table dfs_table( "registry.sx"_n, "registry.sx"_n.value );
   
@@ -128,7 +128,7 @@ tuple<name, asset, name, string> basic::get_dfs_trade_data(asset tokens, symbol_
 }
 
 
-tuple<name, asset, name, string> basic::get_swap_trade_data(name dex_contract, asset tokens, symbol_code to){
+basic::tradeparams basic::get_swap_trade_data(name dex_contract, asset tokens, symbol_code to){
   
   swapSx::tokens _tokens( dex_contract, dex_contract.value );
   name tcontract = "null"_n;
@@ -196,7 +196,7 @@ map<symbol_code, map<asset, string>> basic::get_quotes(map<string, vector<symbol
   return prices;
 }
 
-tuple<asset, symbol_code, string, string> basic::get_best_arb_opportunity(asset eos_tokens) {
+basic::arbparams basic::get_best_arb_opportunity(asset eos_tokens) {
   
   check(eos_tokens.symbol.code().to_string()=="EOS", "Only EOS is supported as base token at the moment");
 
@@ -204,7 +204,7 @@ tuple<asset, symbol_code, string, string> basic::get_best_arb_opportunity(asset 
   auto quotes = get_quotes(pairs, eos_tokens);
 
   //calculate best profits for each symbol and find the best option
-  tuple<asset, symbol_code, string, string> best;
+  arbparams best;
   asset best_gain{-100*10000, {"EOS",4}};
   for(auto& p: quotes){
     if(p.second.size()<2) continue;   //pair traded only on one exchange
@@ -215,7 +215,7 @@ tuple<asset, symbol_code, string, string> basic::get_best_arb_opportunity(asset 
     auto gain = out - eos_tokens;
     if(out.amount > 0 && gain > best_gain){
       best_gain = gain;
-      best = {gain, sym, sellit->second, buyit->second};
+      best = {eos_tokens, sellit->second, buyit->second, sym, gain};
     }
     print(sym.to_string() +"("+to_string(p.second.size())+"): " + sellit->second + "("+sellit->first.to_string()+ ")->" 
                 + buyit->second + "("+out.to_string() +"@" + buyit->first.to_string()+ ") =" + gain.to_string() + "\n");
@@ -230,24 +230,24 @@ void basic::on_transfer(eosio::name& from, eosio::name& to, eosio::asset& sum, s
 
     if(from!="flash.sx"_n) return;      //only handle flash.sx loan notifies
 
-    basic::tradeplan _tradeplan( get_self(), get_self().value );
-    basic::tradeparams trade = _tradeplan.get();
+    basic::arbplan _arbplan( get_self(), get_self().value );
+    basic::arbparams arb = _arbplan.get();
 
-    check(trade.stake==sum, "Received wrong loan from flash.sx: "+sum.to_string());
+    check(arb.stake==sum, "Received wrong loan from flash.sx: "+sum.to_string());
   
-    auto symret = make_trade(trade.stake, trade.symbol, trade.dex_sell);
+    auto symret = make_trade(arb.stake, arb.symcode, arb.dex_sell);
 
-    auto eosret = make_trade(symret, trade.stake.symbol.code(), trade.dex_buy);
+    auto eosret = make_trade(symret, arb.stake.symbol.code(), arb.dex_buy);
     
-    auto profit = eosret-trade.stake;
+    auto profit = eosret-arb.stake;
     check(profit.amount>0, "There was no profit");
 
     eosio::token::transfer_action transfer("eosio.token"_n, { get_self(), "active"_n });
-    transfer.send( get_self(), "flash.sx"_n, trade.stake, "Repaying the loan");
-    transfer.send( get_self(), "fee.sx"_n, profit, trade.stake.symbol.code().to_string()+"/"+trade.symbol.to_string()+" "+trade.dex_sell+"->"+trade.dex_buy);
+    transfer.send( get_self(), "flash.sx"_n, arb.stake, "Repaying the loan");
+    transfer.send( get_self(), "fee.sx"_n, profit, arb.stake.symbol.code().to_string()+"/"+arb.symcode.to_string()+" "+arb.dex_sell+"->"+arb.dex_buy);
     
     //delete singleton?
 
-    print("All done. Profit: "+profit.to_string()+". Expected: "+trade.expected_out.to_string()+"\n");
+    print("All done. Profit: "+profit.to_string()+". Expected: "+arb.exp_profit.to_string()+"\n");
 
 }
