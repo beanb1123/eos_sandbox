@@ -23,7 +23,7 @@ void basic::mine(asset eos_tokens) {
 
   auto arb = get_best_arb_opportunity(eos_tokens);
   
-  print( "Best profit: " + arb.exp_profit.to_string() + " EOS<->" + arb.symcode.to_string() + " " + arb.dex_sell + "=>" + arb.dex_buy );
+  print( "Best profit: " + arb.exp_profit.to_string() + " EOS/" + arb.symcode.to_string() + " " + arb.dex_sell + "->" + arb.dex_buy );
   
   check( arb.exp_profit.amount > 0, "No profits for "+eos_tokens.to_string()+". Closest: " + arb.exp_profit.to_string() + " with " + arb.symcode.to_string() + " " + arb.dex_sell + "=>" + arb.dex_buy );
   
@@ -85,7 +85,7 @@ basic::tradeparams basic::get_defi_trade_data(asset tokens, symbol_code to){
   }
 
  if(pair_id == 0)
-    return  {"null"_n, {0, tokens.symbol}, "null"_n, ""};  //This pair is not supported. 
+    return  {};  //This pair is not supported. 
   
   // get reserves
   const auto [ reserve_in, reserve_out ] = defibox::get_reserves( pair_id, tokens.symbol );
@@ -115,7 +115,7 @@ basic::tradeparams basic::get_dfs_trade_data(asset tokens, symbol_code to){
   }
 
   if(pair_id == 0)
-    return  {"null"_n, {0, tokens.symbol}, "null"_n, ""};  //This pair is not supported. 
+    return  {};  //This pair is not supported. 
   
   // get reserves
   const auto [ reserve_in, reserve_out ] = dfs::get_reserves( pair_id, tokens.symbol );
@@ -141,7 +141,7 @@ basic::tradeparams basic::get_swap_trade_data(name dex_contract, asset tokens, s
   }
 
   if(!foundto || tcontract == "null"_n)
-    return  {"null"_n, {0, tokens.symbol}, "null"_n, ""};  //This pair is not supported. 
+    return {};  //This pair is not supported. 
   
   asset out = swapSx::get_amount_out( dex_contract, tokens, to );
   
@@ -218,7 +218,7 @@ basic::arbparams basic::get_best_arb_opportunity(asset eos_tokens) {
       best = {eos_tokens, sellit->second, buyit->second, sym, gain};
     }
     print(sym.to_string() +"("+to_string(p.second.size())+"): " + sellit->second + "("+sellit->first.to_string()+ ")->" 
-                + buyit->second + "("+out.to_string() +"@" + buyit->first.to_string()+ ") =" + gain.to_string() + "\n");
+                + buyit->second + "("+buyit->first.to_string()+ ")@"+out.to_string() +" =" + gain.to_string() + "\n");
   }
 
   return best;

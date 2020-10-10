@@ -39,10 +39,10 @@ private:
 
     //trade parameters for trade
     struct tradeparams {
-        name            dex;        //exchange name
-        asset           out;        //calculated return    
-        name            tcontract;  //token contract for trade
-        string          memo;       //memo to make trade happen
+        name            dex = "null"_n;         //exchange name
+        asset           out = {0, {"EOS", 4}};  //calculated return    
+        name            tcontract = "null"_n;   //token contract for trade
+        string          memo = "";              //memo to make trade happen
     };
 
     //get parameters for trade of {tokens} on {exchange}
