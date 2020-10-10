@@ -41,11 +41,11 @@ public:
 
 private:
     struct [[eosio::table("tradeplan")]] tradeparams {
-        asset       stake;
-        string        dex_sell;
-        string        dex_buy;
-        symbol_code symbol;
-        asset       calculated_profit;
+        asset           stake;
+        string          dex_sell;
+        string          dex_buy;
+        symbol_code     symbol;
+        asset           expected_out;
     };
     typedef eosio::singleton< "tradeplan"_n, tradeparams > tradeplan;
 
@@ -64,18 +64,20 @@ private:
     tuple<name, asset, name, string> 
     get_dfs_trade_data(asset tokens, symbol_code to);
 
-    //get parameters for trade of {tokens} on swapsx
+    //get parameters for trade of {tokens} on {dex_contract} swap exchange
     //out: {exchange name, calculated return, token contract name, memo needed for trade}
     tuple<name, asset, name, string> 
-    get_swapsx_trade_data(asset tokens, symbol_code to);
+    get_swap_trade_data(name dex_contract, asset tokens, symbol_code to);
     
     //get vector of maps of all pairs we can trade {sym} for based on registry.sx tables
-    //out: i.e. {{{USDT->12},{BOX->23},{IQ->43}}, {{USDT->34},{PIZZA->44}}}
+    //out: i.e. {defi->{BOX,IQ,BTC},dfs->{PIZZA,BTC,ETH}}
     map<string, vector<symbol_code>>
     get_all_pairs(extended_symbol sym);
     
     //based on trade pairs {pairs} and base assets {tokens} build map of quotes 
     //out: {symbol -> {out_tokens -> dex},...} 
+    //i.e. from: {defi->{BOX,IQ,BTC},dfs->{PIZZA,BTC,ETH}}
+    //to: {{dfs->{BOX,BTC,ETH},defi->{BTN,IQ,BTC}}} => {BOX->{{0.1234 EOS->dfs},{1.2345 EOS->defi}},{BTC->{{0.123 EOS->dfs},..}}}
     map<symbol_code, map<asset, string>> 
     get_quotes(map<string, vector<symbol_code>>& pairs, asset tokens);
     
