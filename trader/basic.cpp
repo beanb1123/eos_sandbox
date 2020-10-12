@@ -7,6 +7,7 @@
 #include <uniswap.hpp>
 #include <flash.sx.hpp>
 #include <swap.sx.hpp>
+#include <hamburger.hpp>
 #include <registry.sx.hpp>
 #include <dfs.hpp>
 
@@ -62,6 +63,8 @@ basic::tradeparams basic::get_trade_data(string exchange, asset tokens, symbol_c
     return get_dfs_trade_data(tokens, to);
   if(exchange == "swap.sx" || exchange == "vigor.sx" || exchange == "stable.sx") 
     return get_swap_trade_data(name{exchange}, tokens, to);
+  if(exchange == "hamburger") 
+    return get_hbg_trade_data(tokens, to);
   
   check(false, exchange + " exchange is not supported");
   return {"null"_n, {0, tokens.symbol}, "null"_n, ""};  //dummy
@@ -77,8 +80,8 @@ basic::tradeparams basic::get_defi_trade_data(asset tokens, symbol_code to){
   name tcontract;
   for(const auto& row: defi_table){
     if(row.base.get_symbol() == tokens.symbol){
-      check( row.quotes.count(to), "Target currency is not supported" );
-      pair_id = row.quotes.at(to);
+      check( row.pair_ids.count(to), to.to_string()+" target currency is not supported on Defibox" );
+      pair_id = row.pair_ids.at(to);
       tcontract = row.base.get_contract();
       break;
     }
@@ -107,8 +110,8 @@ basic::tradeparams basic::get_dfs_trade_data(asset tokens, symbol_code to){
   name tcontract;
   for(const auto& row: dfs_table){
     if(row.base.get_symbol() == tokens.symbol){
-      check( row.quotes.count(to), "Target currency is not supported" );
-      pair_id = row.quotes.at(to);
+      check( row.pair_ids.count(to), to.to_string()+" target currency is not supported on DFS" );
+      pair_id = row.pair_ids.at(to);
       tcontract = row.base.get_contract();
       break;
     }
@@ -126,6 +129,37 @@ basic::tradeparams basic::get_dfs_trade_data(asset tokens, symbol_code to){
 
   return {"defisswapcnt"_n, out, tcontract, "swap:" + to_string((int) pair_id)+":0"};
 }
+
+
+    
+basic::tradeparams basic::get_hbg_trade_data(asset tokens, symbol_code to){
+  
+  sx::registry::hamburger_table hbg_table( "registry.sx"_n, "registry.sx"_n.value );
+  
+  uint64_t pair_id = 0;
+  name tcontract;
+  for(const auto& row: hbg_table){
+    if(row.base.get_symbol() == tokens.symbol){
+      check( row.pair_ids.count(to), to.to_string()+" target currency is not supported on Hamburger" );
+      pair_id = row.pair_ids.at(to);
+      tcontract = row.base.get_contract();
+      break;
+    }
+  }
+
+  if(pair_id == 0)
+    return  {};  //This pair is not supported. 
+  
+  // get reserves
+  const auto [ reserve_in, reserve_out ] = hamburger::get_reserves( pair_id, tokens.symbol );
+  const uint8_t fee = hamburger::get_fee();
+
+  // calculate out price  
+  const asset out = uniswap::get_amount_out( tokens, reserve_in, reserve_out, fee );
+
+  return {"hamburgerswp"_n, out, tcontract, "swap:" + to_string((int) pair_id)};
+}
+
 
 
 basic::tradeparams basic::get_swap_trade_data(name dex_contract, asset tokens, symbol_code to){
@@ -153,14 +187,19 @@ map<string, vector<symbol_code>> basic::get_all_pairs(extended_symbol sym){
 
   sx::registry::dfs_table dfs_table( "registry.sx"_n, "registry.sx"_n.value );
   auto dfsrow = dfs_table.get(sym.get_symbol().code().raw(), "DFS doesn't trade this currency");
-  for(auto& p: dfsrow.quotes) 
+  for(auto& p: dfsrow.pair_ids) 
     res["dfs"].push_back(p.first);
 
   
   sx::registry::defibox_table defi_table( "registry.sx"_n, "registry.sx"_n.value );
   auto defirow = defi_table.get(sym.get_symbol().code().raw(), "Defibox doesn't trade this currency");
-  for(auto& p: defirow.quotes) 
+  for(auto& p: defirow.pair_ids) 
     res["defibox"].push_back(p.first);
+
+  sx::registry::hamburger_table hbg_table( "registry.sx"_n, "registry.sx"_n.value );
+  auto hbgrow = hbg_table.get(sym.get_symbol().code().raw(), "Hamburger doesn't trade this currency");
+  for(auto& p: hbgrow.pair_ids) 
+    res["hamburger"].push_back(p.first);
 
   sx::registry::swap_table swap_table( "registry.sx"_n, "registry.sx"_n.value );
   

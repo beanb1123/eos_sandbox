@@ -56,6 +56,10 @@ private:
     //get parameters for trade of {tokens} on dfs
     //out: {exchange name, calculated return, token contract name, memo needed for trade}
     tradeparams get_dfs_trade_data(asset tokens, symbol_code to);
+    
+    //get parameters for trade of {tokens} on hamburger dex
+    //out: {exchange name, calculated return, token contract name, memo needed for trade}
+    tradeparams get_hbg_trade_data(asset tokens, symbol_code to);
 
     //get parameters for trade of {tokens} on {dex_contract} swap exchange
     //out: {exchange name, calculated return, token contract name, memo needed for trade}

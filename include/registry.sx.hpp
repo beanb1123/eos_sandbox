@@ -65,7 +65,7 @@ namespace sx {
          */
         struct [[eosio::table("defibox")]] defibox_row {
             extended_symbol                     base;
-            map<symbol_code, uint64_t>          quotes;
+            map<symbol_code, uint64_t>          pair_ids;
             map<symbol_code, name>              contracts;
 
             uint64_t primary_key() const { return base.get_symbol().code().raw(); }
@@ -74,12 +74,21 @@ namespace sx {
 
         struct [[eosio::table("dfs")]] dfs_row {
             extended_symbol                     base;
-            map<symbol_code, uint64_t>          quotes;
+            map<symbol_code, uint64_t>          pair_ids;
             map<symbol_code, name>              contracts;
 
             uint64_t primary_key() const { return base.get_symbol().code().raw(); }
         };
         typedef eosio::multi_index< "dfs"_n, dfs_row > dfs_table;
+
+        struct [[eosio::table("hamburger")]] hamburger_row {
+            extended_symbol                     base;
+            map<symbol_code, uint64_t>          pair_ids;
+            map<symbol_code, name>              contracts;
+
+            uint64_t primary_key() const { return base.get_symbol().code().raw(); }
+        };
+        typedef eosio::multi_index< "hamburger"_n, hamburger_row > hamburger_table;
 
         /**
          * ## ACTION `setswap`
@@ -127,10 +136,14 @@ namespace sx {
         [[eosio::action]]
         void setdfs( const extended_asset requirement );
 
+        [[eosio::action]]
+        void sethamburger( const extended_asset requirement );
+
         // action wrappers
         using setswap_action = eosio::action_wrapper<"setswap"_n, &registry::setswap>;
         using setdefibox_action = eosio::action_wrapper<"setdefibox"_n, &registry::setdefibox>;
         using setdfs_action = eosio::action_wrapper<"setdfs"_n, &registry::setdfs>;
+        using sethamburger_action = eosio::action_wrapper<"sethamburger"_n, &registry::sethamburger>;
 
     private:
         bool is_requirement( const name contract, const asset reserve, const extended_asset requirement );
