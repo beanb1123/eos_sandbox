@@ -8,6 +8,7 @@
 #include <flash.sx.hpp>
 #include <swap.sx.hpp>
 #include <hamburger.hpp>
+#include <pizza.hpp>
 #include <registry.sx.hpp>
 #include <dfs.hpp>
 
@@ -38,6 +39,25 @@ void basic::mine(asset eos_tokens) {
 
 }
 
+[[eosio::action]]
+void basic::trade(asset tokens, asset minreturn, string exchange){
+  
+  check( tokens.amount > 0 && minreturn.amount > 0, "Invalid tokens amount" );
+  
+  auto [dex, out, tcontract, memo] = get_trade_data(exchange, tokens, minreturn.symbol.code());
+  
+  check(minreturn <= out || minreturn.amount==0, "Return is not enough");
+  
+  // log out price
+  log_action log( get_self(), { get_self(), "active"_n });
+  log.send( out );    
+  
+  // make a swap
+  token::transfer_action transfer( tcontract, { get_self(), "active"_n });
+  transfer.send( get_self(), dex, tokens, memo);
+          
+}
+
 asset basic::make_trade(asset tokens, symbol_code sym, string exchange){
   
   check( tokens.amount > 0, "Invalid tokens amount" );
@@ -65,6 +85,8 @@ basic::tradeparams basic::get_trade_data(string exchange, asset tokens, symbol_c
     return get_swap_trade_data(name{exchange}, tokens, to);
   if(exchange == "hamburger") 
     return get_hbg_trade_data(tokens, to);
+  if(exchange == "pizza") 
+    return get_pizza_trade_data(tokens, to);
   
   check(false, exchange + " exchange is not supported");
   return {"null"_n, {0, tokens.symbol}, "null"_n, ""};  //dummy
@@ -159,7 +181,34 @@ basic::tradeparams basic::get_hbg_trade_data(asset tokens, symbol_code to){
 
   return {"hamburgerswp"_n, out, tcontract, "swap:" + to_string((int) pair_id)};
 }
+  
+basic::tradeparams basic::get_pizza_trade_data(asset tokens, symbol_code to){
+  
+  sx::registry::pizza_table pz_table( "registry.sx"_n, "registry.sx"_n.value );
+  
+  uint64_t pair_id = 0;
+  name tcontract;
+  for(const auto& row: pz_table){
+    if(row.base.get_symbol() == tokens.symbol){
+      check( row.pair_ids.count(to), to.to_string()+" target currency is not supported on Pizza" );
+      pair_id = row.pair_ids.at(to);
+      tcontract = row.base.get_contract();
+      break;
+    }
+  }
 
+  if(pair_id == 0)
+    return  {};  //This pair is not supported. 
+  
+  // get reserves
+  const auto [ reserve_in, reserve_out ] = pizza::get_reserves( pair_id, tokens.symbol );
+  const uint8_t fee = pizza::get_fee();
+
+  // calculate out price  
+  const asset out = uniswap::get_amount_out( tokens, reserve_in, reserve_out, fee );
+
+  return {"pzaswapcntct"_n, out, tcontract, name{pair_id}.to_string()+"-swap-0"};
+}
 
 
 basic::tradeparams basic::get_swap_trade_data(name dex_contract, asset tokens, symbol_code to){
@@ -200,6 +249,11 @@ map<string, vector<symbol_code>> basic::get_all_pairs(extended_symbol sym){
   auto hbgrow = hbg_table.get(sym.get_symbol().code().raw(), "Hamburger doesn't trade this currency");
   for(auto& p: hbgrow.pair_ids) 
     res["hamburger"].push_back(p.first);
+
+  sx::registry::pizza_table pz_table( "registry.sx"_n, "registry.sx"_n.value );
+  auto pzrow = pz_table.get(sym.get_symbol().code().raw(), "Pizza doesn't trade this currency");
+  for(auto& p: pzrow.pair_ids) 
+    res["pizza"].push_back(p.first);
 
   sx::registry::swap_table swap_table( "registry.sx"_n, "registry.sx"_n.value );
   

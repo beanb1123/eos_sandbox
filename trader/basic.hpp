@@ -15,11 +15,16 @@ public:
     [[eosio::action]]
     void mine(asset eos_tokens);
 
+    //trade {tokens} on {exchange} with expected return of >= {minreturn}
+    //mainly for testing new exchanges
+    [[eosio::action]]
+    void trade(asset tokens, asset minreturn, string exchange);
+
     //log asset
     [[eosio::action]]
     void log( asset& out ){
         require_auth( get_self() );
-    }
+    };
     using log_action = action_wrapper<"log"_n, &basic::log>;
 
     [[eosio::on_notify("eosio.token::transfer")]]   
@@ -60,6 +65,10 @@ private:
     //get parameters for trade of {tokens} on hamburger dex
     //out: {exchange name, calculated return, token contract name, memo needed for trade}
     tradeparams get_hbg_trade_data(asset tokens, symbol_code to);
+
+    //get parameters for trade of {tokens} on pizza dex
+    //out: {exchange name, calculated return, token contract name, memo needed for trade}
+    tradeparams get_pizza_trade_data(asset tokens, symbol_code to);
 
     //get parameters for trade of {tokens} on {dex_contract} swap exchange
     //out: {exchange name, calculated return, token contract name, memo needed for trade}

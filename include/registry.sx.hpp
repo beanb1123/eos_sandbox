@@ -90,6 +90,15 @@ namespace sx {
         };
         typedef eosio::multi_index< "hamburger"_n, hamburger_row > hamburger_table;
 
+        struct [[eosio::table("pizza")]] pizza_row {
+            extended_symbol                     base;
+            map<symbol_code, uint64_t>          pair_ids;
+            map<symbol_code, name>              contracts;
+
+            uint64_t primary_key() const { return base.get_symbol().code().raw(); }
+        };
+        typedef eosio::multi_index< "pizza"_n, pizza_row > pizza_table;
+
         /**
          * ## ACTION `setswap`
          *
@@ -139,11 +148,15 @@ namespace sx {
         [[eosio::action]]
         void sethamburger( const extended_asset requirement );
 
+        [[eosio::action]]
+        void setpizza( const extended_asset requirement );
+
         // action wrappers
         using setswap_action = eosio::action_wrapper<"setswap"_n, &registry::setswap>;
         using setdefibox_action = eosio::action_wrapper<"setdefibox"_n, &registry::setdefibox>;
         using setdfs_action = eosio::action_wrapper<"setdfs"_n, &registry::setdfs>;
         using sethamburger_action = eosio::action_wrapper<"sethamburger"_n, &registry::sethamburger>;
+        using setpizza_action = eosio::action_wrapper<"setpizza"_n, &registry::setpizza>;
 
     private:
         bool is_requirement( const name contract, const asset reserve, const extended_asset requirement );
