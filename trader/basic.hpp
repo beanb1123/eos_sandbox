@@ -11,14 +11,14 @@ public:
       : contract(rec, code, ds)
     {};
     
-    //find arbitrage opportunity and execute it
+    //find arbitrage opportunity for {quantity} asset and execute it
     [[eosio::action]]
-    void mine(asset eos_tokens);
+    void mine(name executor, extended_asset ext_quantity);
 
     //trade {tokens} on {exchange} with expected return of >= {minreturn}
     //mainly for testing new exchanges
     [[eosio::action]]
-    void trade(asset tokens, asset minreturn, string exchange);
+    void trade(asset quantity, asset minreturn, string exchange);
 
     //log asset
     [[eosio::action]]
@@ -34,7 +34,7 @@ public:
 private:
     //arbitration parameters to save into singleton
     struct [[eosio::table("arbplan")]] arbparams {
-        asset           stake;          //our stake we borrow from flash.sx
+        extended_asset  stake;          //our stake we borrow from flash.sx
         string          dex_sell;       //exchange to sell stake to
         string          dex_buy;        //exchange to buy from
         symbol_code     symcode;        //symbol code to arbitrage via
@@ -86,7 +86,7 @@ private:
     
     //find best arbitrage opportunity based on {eos_tokens} bet
     //out: {expected profit, symbol, dex to sell, dex to buy}
-    arbparams get_best_arb_opportunity(asset eos_tokens);
+    arbparams get_best_arb_opportunity(extended_asset ext_tokens);
 
     //trade {tokens} to {sym} currency on {exchange}
     //out: expected return
