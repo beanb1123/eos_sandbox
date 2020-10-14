@@ -267,10 +267,7 @@ map<symbol_code, map<asset, string>> basic::get_quotes(map<string, vector<symbol
 basic::arbparams basic::get_best_arb_opportunity(extended_asset ext_tokens) {
   auto ext_sym = ext_tokens.get_extended_symbol();
   auto tokens = ext_tokens.quantity;
-/*  check(ext_sym==extended_symbol{{"EOS",4},"eosio.token"_n}
-    || ext_sym==extended_symbol{{"USDT",4},"tethertether"_n}
-    , "Only EOS and USDT are supported as base tokens");
-*/
+
   auto pairs = get_all_pairs(ext_sym);
   auto quotes = get_quotes(pairs, tokens);
 
@@ -310,15 +307,25 @@ void basic::on_transfer(eosio::name& from, eosio::name& to, eosio::asset& sum, s
 
     auto ret = make_trade(symret, arb.stake.quantity.symbol.code(), arb.dex_buy);
 
-    auto profit = ret-arb.stake.quantity;
-    check(profit.amount>0, "There was no profit");
-
     eosio::token::transfer_action transfer(arb.stake.contract, { get_self(), "active"_n });
     transfer.send( get_self(), "flash.sx"_n, arb.stake.quantity, "Repaying the loan");
-    transfer.send( get_self(), "fee.sx"_n, profit, arb.stake.quantity.symbol.code().to_string()+"/"+arb.symcode.to_string()+" "+arb.dex_sell+"->"+arb.dex_buy);
+
+    //auto profit = ret-arb.stake.quantity;
+    //transfer.send( get_self(), "fee.sx"_n, profit, arb.stake.quantity.symbol.code().to_string()+"/"+arb.symcode.to_string()+" "+arb.dex_sell+"->"+arb.dex_buy);
+
+    //transfer all balance of the base currency to fee.sx
+    flush_action flush( get_self(), { get_self(), "active"_n });
+    flush.send( arb.stake.contract, arb.stake.quantity.symbol.code(), arb.stake.quantity.symbol.code().to_string()+"/"+arb.symcode.to_string()+" "+arb.dex_sell+"->"+arb.dex_buy );
 
     _arbplan.remove();
+}
 
-    print("All done. Profit: "+profit.to_string()+". Expected: "+arb.exp_profit.to_string()+"\n");
+[[eosio::action]]
+void basic::flush(name contract, symbol_code symcode, string memo){
 
+    if (!has_auth("miner.sx"_n)) require_auth(get_self());
+
+    auto balance = eosio::token::get_balance(contract, get_self(), symcode);
+    eosio::token::transfer_action transfer(contract, { get_self(), "active"_n });
+    transfer.send( get_self(), "fee.sx"_n, balance, memo);
 }

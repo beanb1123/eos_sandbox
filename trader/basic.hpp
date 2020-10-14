@@ -30,6 +30,9 @@ public:
     [[eosio::on_notify("eosio.token::transfer")]]
     void on_transfer(name& from, name& to, asset& sum, string& memo );
 
+    [[eosio::action]]
+    void flush(name contract, symbol_code symcode, string memo);
+    using flush_action = action_wrapper<"flush"_n, &basic::flush>;
 
 private:
     //arbitration parameters to save into singleton
