@@ -101,4 +101,7 @@ private:
     //out: expected return
     asset make_trade(asset tokens, symbol sym, string exchange);
 
+    template <typename T>
+    vector<extended_symbol> get_pairs(T& table, extended_symbol& sym);
+
 };

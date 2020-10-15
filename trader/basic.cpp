@@ -294,57 +294,44 @@ basic::tradeparams basic::get_sapex_trade_data(asset tokens, symbol to){
   return {"sapexamm.eo"_n, out, tcontract, to.code().to_string()};
 }
 
+template <typename T>
+vector<extended_symbol> basic::get_pairs(T& table, extended_symbol& sym){
+  vector<extended_symbol> res;
+
+  auto rowit = table.find(sym.get_symbol().code().raw());
+  if(rowit!=table.end())
+    for(auto& p: rowit->quotes)
+      res.push_back(p.first);
+
+  return res;
+}
 
 map<string, vector<extended_symbol>> basic::get_all_pairs(extended_symbol sym){
   map<string, vector<extended_symbol>> res;
 
   sx::registry::swap_defi_table defi_table( "registry.sx"_n, "registry.sx"_n.value );
-  auto defirowit = defi_table.find(sym.get_symbol().code().raw());
-  if(defirowit!=defi_table.end())
-    for(auto& p: defirowit->quotes)
-      res["defibox"].push_back(p.first);
+  res["defibox"] = get_pairs(defi_table, sym);
 
   sx::registry::defisswapcnt_table dfs_table( "registry.sx"_n, "registry.sx"_n.value );
-  auto dfsrowit = dfs_table.find(sym.get_symbol().code().raw());
-  if(dfsrowit!=dfs_table.end())
-    for(auto& p: dfsrowit->quotes)
-      res["dfs"].push_back(p.first);
+  res["dfs"] = get_pairs(dfs_table, sym);
 
   sx::registry::hamburgerswp_table hbg_table( "registry.sx"_n, "registry.sx"_n.value );
-  auto hbgrowit = hbg_table.find(sym.get_symbol().code().raw());
-  if(hbgrowit!=hbg_table.end())
-    for(auto& p: hbgrowit->quotes)
-      res["hamburger"].push_back(p.first);
+  res["hamburger"] = get_pairs(hbg_table, sym);
 
   sx::registry::pzaswapcntct_table pz_table( "registry.sx"_n, "registry.sx"_n.value );
-  auto pzrowit = pz_table.find(sym.get_symbol().code().raw());
-  if(pzrowit!=pz_table.end())
-    for(auto& p: pzrowit->quotes)
-      res["pizza"].push_back(p.first);
+  res["pizza"] = get_pairs(pz_table, sym);
 
   sx::registry::swap_sx_table swap_sx_table( "registry.sx"_n, "registry.sx"_n.value );
-  auto swapsxrowit = swap_sx_table.find(sym.get_symbol().code().raw());
-  if(swapsxrowit!=swap_sx_table.end())
-    for(auto& p: swapsxrowit->quotes)
-      res["swap.sx"].push_back(p.first);
+  res["swap.sx"] = get_pairs(swap_sx_table, sym);
 
   sx::registry::vigor_sx_table vigor_sx_table( "registry.sx"_n, "registry.sx"_n.value );
-  auto vigorsxrowit = vigor_sx_table.find(sym.get_symbol().code().raw());
-  if(vigorsxrowit!=vigor_sx_table.end())
-    for(auto& p: vigorsxrowit->quotes)
-      res["vigor.sx"].push_back(p.first);
+  res["vigor.sx"] = get_pairs(vigor_sx_table, sym);
 
   sx::registry::stable_sx_table stable_sx_table( "registry.sx"_n, "registry.sx"_n.value );
-  auto stablesxrowit = stable_sx_table.find(sym.get_symbol().code().raw());
-  if(stablesxrowit!=stable_sx_table.end())
-    for(auto& p: stablesxrowit->quotes)
-      res["stable.sx"].push_back(p.first);
+  res["stable.sx"] = get_pairs(stable_sx_table, sym);
 
   sx::registry::sapexamm_eo_table sapex_table( "registry.sx"_n, "registry.sx"_n.value );
-  auto sapexrowit = sapex_table.find(sym.get_symbol().code().raw());
-  if(sapexrowit!=sapex_table.end())
-    for(auto& p: sapexrowit->quotes)
-      res["sapex"].push_back(p.first);
+  res["sapex"] = get_pairs(sapex_table, sym);
 
   return res;
 }
