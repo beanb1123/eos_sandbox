@@ -287,7 +287,7 @@ basic::tradeparams basic::get_sapex_trade_data(asset tokens, symbol to){
 
   // get reserves
   const auto [ reserve_in, reserve_out ] = sapex::get_reserves(tokens.symbol, to);
-  const uint8_t fee = sapex::get_fee();
+  const uint8_t fee = sapex::get_fee(tokens.symbol, to);
 
   asset out = uniswap::get_amount_out( tokens, reserve_in, reserve_out, fee );
 
@@ -299,11 +299,6 @@ map<string, vector<extended_symbol>> basic::get_all_pairs(extended_symbol sym){
   map<string, vector<extended_symbol>> res;
 
   sx::registry::swap_defi_table defi_table( "registry.sx"_n, "registry.sx"_n.value );
-  auto defirowit = defi_table.find(sym.get_symbol().code().raw());
-  if(defirowit!=defi_table.end())
-    for(auto& p: defirowit->quotes)
-      res["defibox"].push_back(p.first);
-
   sx::registry::defisswapcnt_table dfs_table( "registry.sx"_n, "registry.sx"_n.value );
   auto dfsrowit = dfs_table.find(sym.get_symbol().code().raw());
   if(dfsrowit!=dfs_table.end())
@@ -339,13 +334,13 @@ map<string, vector<extended_symbol>> basic::get_all_pairs(extended_symbol sym){
   if(stablesxrowit!=stable_sx_table.end())
     for(auto& p: stablesxrowit->quotes)
       res["stable.sx"].push_back(p.first);
-/*
-  sx::registry::sapex_table sapex_table( "registry.sx"_n, "registry.sx"_n.value );
+
+  sx::registry::sapexamm_eo_table sapex_table( "registry.sx"_n, "registry.sx"_n.value );
   auto sapexrowit = sapex_table.find(sym.get_symbol().code().raw());
   if(sapexrowit!=sapex_table.end())
-    for(auto& p: sapexrowit->pair_ids)
+    for(auto& p: sapexrowit->quotes)
       res["sapex"].push_back(p.first);
-*/
+
   return res;
 }
 
@@ -410,6 +405,8 @@ void basic::on_transfer(eosio::name& from, eosio::name& to, eosio::asset& sum, s
     auto symret = make_trade(arb.stake.quantity, arb.symbol, arb.dex_sell);
 
     auto ret = make_trade(symret, arb.stake.quantity.symbol, arb.dex_buy);
+
+    check(ret>=arb.stake.quantity, "No profits");
 
     eosio::token::transfer_action transfer(arb.stake.contract, { get_self(), "active"_n });
     transfer.send( get_self(), "flash.sx"_n, arb.stake.quantity, "Repaying the loan");

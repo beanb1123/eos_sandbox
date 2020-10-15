@@ -23,7 +23,12 @@ namespace sapex {
     /**
      * ## STATIC `get_fee`
      *
-     * Get Sapex total fee
+     * Get Sapex total fee. 0.10% for each hop + 0.01% rounding error
+     *
+     * ### params
+     *
+     * - `{symbol} sym1` - incoming symbol
+     * - `{symbol} sym2` - outgoing symbol
      *
      * ### returns
      *
@@ -32,13 +37,13 @@ namespace sapex {
      * ### example
      *
      * ```c++
-     * const uint8_t fee = dfs::get_fee();
+     * const uint8_t fee = sapex::get_fee();
      * // => 0
      * ```
      */
-    static uint8_t get_fee()
+    static uint8_t get_fee(symbol& from, symbol& to)
     {
-        return 0;
+        return from.code()==symbol_code{"SAPEX"} || to.code()==symbol_code{"SAPEX"} ? 11 : 22;
     }
 
     /**
@@ -72,6 +77,8 @@ namespace sapex {
         //neither is SAPEX
         auto row1 = _markets.get( sym1.code().raw(), "SAPEXLibrary: INVALID_SYMBOL" );
         auto row2 = _markets.get( sym2.code().raw(), "SAPEXLibrary: INVALID_SYMBOL" );
-        return { { (int64_t)row1.token, sym1 }, { (int64_t)row2.token, sym2 } };
+
+        auto out = row2.token * ( ((double)row1.sapex) / row2.sapex);
+        return { { (int64_t)row1.token, sym1 }, { (int64_t)out, sym2 } };
     }
 }
