@@ -299,6 +299,11 @@ map<string, vector<extended_symbol>> basic::get_all_pairs(extended_symbol sym){
   map<string, vector<extended_symbol>> res;
 
   sx::registry::swap_defi_table defi_table( "registry.sx"_n, "registry.sx"_n.value );
+  auto defirowit = defi_table.find(sym.get_symbol().code().raw());
+  if(defirowit!=defi_table.end())
+    for(auto& p: defirowit->quotes)
+      res["defibox"].push_back(p.first);
+
   sx::registry::defisswapcnt_table dfs_table( "registry.sx"_n, "registry.sx"_n.value );
   auto dfsrowit = dfs_table.find(sym.get_symbol().code().raw());
   if(dfsrowit!=dfs_table.end())
