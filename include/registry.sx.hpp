@@ -2,6 +2,7 @@
 
 #include <eosio/eosio.hpp>
 #include <eosio/system.hpp>
+#include <eosio/singleton.hpp>
 #include <eosio/asset.hpp>
 
 using namespace eosio;
@@ -42,23 +43,28 @@ namespace sx {
         };
         typedef eosio::multi_index< "swap"_n, swap_row > swap_table;
 
+        struct [[eosio::table("sapex")]] sapex_row {
+            name                    contract;
+            set<symbol_code>        tokens;
+            set<extended_symbol>    ext_tokens;
+
+            uint64_t primary_key() const { return contract.value; }
+        };
+        typedef eosio::multi_index< "sapex"_n, sapex_row > sapex_table;
+
         /**
          * ## TABLE `defibox`
          *
-         * - `{extended_symbol} base` - base symbols
-         * - `{map<symbol_code, uint64_t>} pair_ids` - pair ids
-         * - `{map<symbol_code, extended_symbol>} contracts` - contracts
+         * - `{extended_symbol} base` - base symbol
+         * - `{map<extended_symbol, string>} quotes` - quote symbols (`string` for additional exchange requirements)
          *
          * ### example
          *
          * ```json
          * {
          *     "base": {"contract":"eosio.token", "symbol": "4,EOS"},
-         *     "pair_ids": [
-         *         {"key": "USDT", "value": 12}
-         *     ],
-         *     "contracts": [
-         *         {"key": "USDT", "value": "tethertether"}
+         *     "quotes": [
+         *         {"key": {"contract": "tethertether", "symbol": "4,USDT"}, "value": "12"}
          *     ]
          * }
          * ```
@@ -99,74 +105,106 @@ namespace sx {
         };
         typedef eosio::multi_index< "pizza"_n, pizza_row > pizza_table;
 
+        struct schema {
+            extended_symbol                    base;
+            map<extended_symbol, string>       quotes;
+
+            uint64_t primary_key() const { return base.get_symbol().code().raw(); }
+        };
+
+        // DFS - https://apps.defis.network/
+        struct [[eosio::table("defisswapcnt")]] defisswapcnt_row : schema {};
+        typedef eosio::multi_index< "defisswapcnt"_n, defisswapcnt_row > defisswapcnt_table;
+
+        // Defibox BOX - https://defibox.io
+        struct [[eosio::table("swap.defi")]] swap_defi_row : schema {};
+        typedef eosio::multi_index< "swap.defi"_n, swap_defi_row > swap_defi_table;
+
+        // HamburgerSwap HBG - https://hbg.finance/swap
+        struct [[eosio::table("hamburgerswp")]] hamburgerswp_row : schema {};
+        typedef eosio::multi_index< "hamburgerswp"_n, hamburgerswp_row > hamburgerswp_table;
+
+        // PIZZA - https://v1.pizza.live/swap
+        struct [[eosio::table("pzaswapcntct")]] pzaswapcntct_row : schema {};
+        typedef eosio::multi_index< "pzaswapcntct"_n, pzaswapcntct_row > pzaswapcntct_table;
+
+        // SAPEX - http://sapex.one
+        struct [[eosio::table("sapexamm.eo")]] sapexamm_eo_row : schema {};
+        typedef eosio::multi_index< "sapexamm.eo"_n, sapexamm_eo_row > sapexamm_eo_table;
+
+        // SX - swap.sx
+        struct [[eosio::table("swap.sx")]] swap_sx_row : schema {};
+        typedef eosio::multi_index< "swap.sx"_n, swap_sx_row > swap_sx_table;
+
+        // SX - stable.sx
+        struct [[eosio::table("stable.sx")]] stable_sx_row : schema {};
+        typedef eosio::multi_index< "stable.sx"_n, stable_sx_row > stable_sx_table;
+
+        // SX - vigor.sx
+        struct [[eosio::table("vigor.sx")]] vigor_sx_row : schema {};
+        typedef eosio::multi_index< "vigor.sx"_n, vigor_sx_row > vigor_sx_table;
+
         /**
-         * ## ACTION `setswap`
+         * ## TABLE `global`
          *
-         * Set swap contract
-         *
-         * - **authority**: `get_self()`
-         *
-         * ### params
-         *
-         * - `{name} contract` - swap contract account name
+         * - `{set<name>} contracts` - exchange contracts
          *
          * ### example
          *
-         * ```bash
-         * cleos push action registry.sx setswap '["eosdt.sx"]' -p registry.sx
+         * ```json
+         * {
+         *     "contracts": ["swap.sx", "vigor.sx", "stable.sx"]
+         * }
          * ```
          */
-        [[eosio::action]]
-        void setswap( const name contract );
-
-        [[eosio::action]]
-        void clear();
+        struct [[eosio::table("sx")]] sx_row {
+            set<name>         contracts;
+        };
+        typedef eosio::singleton< "sx"_n, sx_row > sx_table;
 
         /**
-         * ## ACTION `setdefibox`
+         * ## ACTION `setexchange`
          *
-         * Set defibox pairs
+         * Update exchange pairs
          *
          * - **authority**: `get_self()`
          *
          * ### params
          *
+         * - `{name} contract` - exchange contract
          * - `{extended_asset} requirement` - minimum requirements
          *
          * ### example
          *
          * ```bash
-         * cleos push action registry.sx setdefibox '[{"contract": "eosio.token", "quantity": "1000.0000 EOS"}]' -p registry.sx
+         * cleos push action registry.sx update '["swap.sx", {"contract": "eosio.token", "quantity": "1000.0000 EOS"}]' -p registry.sx
          * ```
          */
         [[eosio::action]]
-        void setdefibox( const extended_asset requirement );
+        void update( const name contract, const extended_asset requirement );
 
         [[eosio::action]]
-        void setdfs( const extended_asset requirement );
-
-        [[eosio::action]]
-        void sethamburger( const extended_asset requirement );
-
-        [[eosio::action]]
-        void setpizza( const extended_asset requirement );
+        void clear( const name table );
 
         // action wrappers
-        using setswap_action = eosio::action_wrapper<"setswap"_n, &registry::setswap>;
-        using setdefibox_action = eosio::action_wrapper<"setdefibox"_n, &registry::setdefibox>;
-        using setdfs_action = eosio::action_wrapper<"setdfs"_n, &registry::setdfs>;
-        using sethamburger_action = eosio::action_wrapper<"sethamburger"_n, &registry::sethamburger>;
-        using setpizza_action = eosio::action_wrapper<"setpizza"_n, &registry::setpizza>;
+        using update_action = eosio::action_wrapper<"update"_n, &registry::update>;
+        using clear_action = eosio::action_wrapper<"clear"_n, &registry::clear>;
 
     private:
         bool is_requirement( const name contract, const asset reserve, const extended_asset requirement );
 
         template <typename T>
-        void add_pair( T& table, const extended_symbol base, const extended_symbol quote, const uint64_t pair_id );
+        void add_pair( T& table, const extended_symbol base, const extended_symbol quote, const string optional = "");
 
         template <typename T>
         void clear_table( T& table );
 
-        // void add_token( const symbol sym, const name contract );
+        // update tables
+        void set_defisswapcnt( const extended_asset requirement );
+        void set_swap_defi( const extended_asset requirement );
+        void set_hamburgerswp( const extended_asset requirement );
+        void set_pzaswapcntct( const extended_asset requirement );
+        void set_sapexamm_eo();
+        void set_sx();
     };
 }

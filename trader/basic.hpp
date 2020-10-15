@@ -40,7 +40,7 @@ private:
         extended_asset  stake;          //our stake we borrow from flash.sx
         string          dex_sell;       //exchange to sell stake to
         string          dex_buy;        //exchange to buy from
-        symbol_code     symcode;        //symbol code to arbitrage via
+        symbol          symbol;        //symbol code to arbitrage via
         asset           exp_profit;     //expected profit from arbitrage
     };
     typedef eosio::singleton< "arbplan"_n, arbparams > arbplan;
@@ -55,37 +55,43 @@ private:
 
     //get parameters for trade of {tokens} on {exchange}
     //out: {exchange name, calculated return, token contract name, memo needed for trade}
-    tradeparams get_trade_data(string exchange, asset tokens, symbol_code to);
+    tradeparams get_trade_data(string exchange, asset tokens, symbol to);
 
     //get parameters for trade of {tokens} on defibox
     //out: {exchange name, calculated return, token contract name, memo needed for trade}
-    tradeparams get_defi_trade_data(asset tokens, symbol_code to);
+    tradeparams get_defi_trade_data(asset tokens, symbol to);
 
     //get parameters for trade of {tokens} on dfs
     //out: {exchange name, calculated return, token contract name, memo needed for trade}
-    tradeparams get_dfs_trade_data(asset tokens, symbol_code to);
+    tradeparams get_dfs_trade_data(asset tokens, symbol to);
 
     //get parameters for trade of {tokens} on hamburger dex
     //out: {exchange name, calculated return, token contract name, memo needed for trade}
-    tradeparams get_hbg_trade_data(asset tokens, symbol_code to);
+    tradeparams get_hbg_trade_data(asset tokens, symbol to);
 
     //get parameters for trade of {tokens} on pizza dex
     //out: {exchange name, calculated return, token contract name, memo needed for trade}
-    tradeparams get_pizza_trade_data(asset tokens, symbol_code to);
+    tradeparams get_pizza_trade_data(asset tokens, symbol to);
 
-    //get parameters for trade of {tokens} on {dex_contract} swap exchange
+    //get parameters for trade of {tokens} on sapex dex
     //out: {exchange name, calculated return, token contract name, memo needed for trade}
-    tradeparams get_swap_trade_data(name dex_contract, asset tokens, symbol_code to);
+    tradeparams get_sapex_trade_data(asset tokens, symbol to);
+
+    //get parameters for trade of {tokens} on swap.sx exchange
+    //out: { calculated return, token contract name, memo needed for trade}
+    tradeparams get_swapsx_trade_data( asset tokens, symbol to);
+    tradeparams get_stablesx_trade_data( asset tokens, symbol to);
+    tradeparams get_vigorsx_trade_data( asset tokens, symbol to);
 
     //get vector of maps of all pairs we can trade {sym} for based on registry.sx tables
     //out: i.e. {defi->{BOX,IQ,BTC},dfs->{PIZZA,BTC,ETH}}
-    map<string, vector<symbol_code>> get_all_pairs(extended_symbol sym);
+    map<string, vector<extended_symbol>> get_all_pairs(extended_symbol sym);
 
     //based on trade pairs {pairs} and base assets {tokens} build map of quotes
     //out: {symbol -> {out_tokens -> dex},...}
     //i.e. from: {defi->{BOX,IQ,BTC},dfs->{PIZZA,BTC,ETH}}
     //to: {{dfs->{BOX,BTC,ETH},defi->{BTN,IQ,BTC}}} => {BOX->{{0.1234 EOS->dfs},{1.2345 EOS->defi}},{BTC->{{0.123 EOS->dfs},..}}}
-    map<symbol_code, map<asset, string>>  get_quotes(map<string, vector<symbol_code>>& pairs, asset tokens);
+    map<symbol, map<asset, string>>  get_quotes(map<string, vector<extended_symbol>>& pairs, asset ext_tokens);
 
     //find best arbitrage opportunity based on {eos_tokens} bet
     //out: {expected profit, symbol, dex to sell, dex to buy}
@@ -93,6 +99,6 @@ private:
 
     //trade {tokens} to {sym} currency on {exchange}
     //out: expected return
-    asset make_trade(asset tokens, symbol_code sym, string exchange);
+    asset make_trade(asset tokens, symbol sym, string exchange);
 
 };
