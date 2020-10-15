@@ -103,7 +103,7 @@ basic::tradeparams basic::get_trade_data(string exchange, asset tokens, symbol t
     return get_sapex_trade_data(tokens, to);
 
   check(false, exchange + " exchange is not supported");
-  return {"null"_n, {0, tokens.symbol}, "null"_n, ""};  //dummy
+  return {};  //dummy
 
 }
 
@@ -339,7 +339,7 @@ map<string, vector<extended_symbol>> basic::get_all_pairs(extended_symbol sym){
 
 map<symbol, map<asset, string>> basic::get_quotes(map<string, vector<extended_symbol>>& pairs, asset tokens)  {
 
-  //for common symbols build a map {BOX->{{0.1234 BOX,"defi"},{0.1345 BOX, "dfs"}},...}
+  //for {tokens.symbol} build a map of how it could be traded {BOX->{{0.1234 BOX,"defi"},{0.1345 BOX, "dfs"}},...}
   map<symbol, map<asset, string>> prices;
   for(auto& p: pairs){
     auto dex = p.first;
@@ -348,7 +348,6 @@ map<symbol, map<asset, string>> basic::get_quotes(map<string, vector<extended_sy
       if(out.amount > 0) prices[ext_sym.get_symbol()][out] = dex;
     }
   }
-  //check(false, "Quotes: "+to_string(prices.size()));
 
   return prices;
 }
@@ -361,7 +360,6 @@ basic::arbparams basic::get_best_arb_opportunity(extended_asset ext_tokens) {
   auto pairs = get_all_pairs(ext_sym);
   auto quotes = get_quotes(pairs, tokens);
 
-  //check(false, "Quotes: "+to_string(quotes.size())+" Pairs: "+to_string(pairs.size()));
   //calculate best profits for each symbol and find the best option
   arbparams best;
   asset best_gain{-100*10000, ext_sym.get_symbol()};
@@ -398,13 +396,10 @@ void basic::on_transfer(eosio::name& from, eosio::name& to, eosio::asset& sum, s
 
     auto ret = make_trade(symret, arb.stake.quantity.symbol, arb.dex_buy);
 
-    check(ret>=arb.stake.quantity, "No profits");
+    check(ret >= arb.stake.quantity, "No profits");
 
     eosio::token::transfer_action transfer(arb.stake.contract, { get_self(), "active"_n });
     transfer.send( get_self(), "flash.sx"_n, arb.stake.quantity, "Repaying the loan");
-
-    //auto profit = ret-arb.stake.quantity;
-    //transfer.send( get_self(), "fee.sx"_n, profit, arb.stake.quantity.symbol.code().to_string()+"/"+arb.symcode.to_string()+" "+arb.dex_sell+"->"+arb.dex_buy);
 
     //transfer all balance of the base currency to fee.sx
     flush_action flush( get_self(), { get_self(), "active"_n });

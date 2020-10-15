@@ -43,17 +43,8 @@ namespace sx {
         };
         typedef eosio::multi_index< "swap"_n, swap_row > swap_table;
 
-        struct [[eosio::table("sapex")]] sapex_row {
-            name                    contract;
-            set<symbol_code>        tokens;
-            set<extended_symbol>    ext_tokens;
-
-            uint64_t primary_key() const { return contract.value; }
-        };
-        typedef eosio::multi_index< "sapex"_n, sapex_row > sapex_table;
-
         /**
-         * ## TABLE `defibox`
+         * ## STRUCT `schema`
          *
          * - `{extended_symbol} base` - base symbol
          * - `{map<extended_symbol, string>} quotes` - quote symbols (`string` for additional exchange requirements)
@@ -69,42 +60,6 @@ namespace sx {
          * }
          * ```
          */
-        struct [[eosio::table("defibox")]] defibox_row {
-            extended_symbol                     base;
-            map<symbol_code, uint64_t>          pair_ids;
-            map<symbol_code, name>              contracts;
-
-            uint64_t primary_key() const { return base.get_symbol().code().raw(); }
-        };
-        typedef eosio::multi_index< "defibox"_n, defibox_row > defibox_table;
-
-        struct [[eosio::table("dfs")]] dfs_row {
-            extended_symbol                     base;
-            map<symbol_code, uint64_t>          pair_ids;
-            map<symbol_code, name>              contracts;
-
-            uint64_t primary_key() const { return base.get_symbol().code().raw(); }
-        };
-        typedef eosio::multi_index< "dfs"_n, dfs_row > dfs_table;
-
-        struct [[eosio::table("hamburger")]] hamburger_row {
-            extended_symbol                     base;
-            map<symbol_code, uint64_t>          pair_ids;
-            map<symbol_code, name>              contracts;
-
-            uint64_t primary_key() const { return base.get_symbol().code().raw(); }
-        };
-        typedef eosio::multi_index< "hamburger"_n, hamburger_row > hamburger_table;
-
-        struct [[eosio::table("pizza")]] pizza_row {
-            extended_symbol                     base;
-            map<symbol_code, uint64_t>          pair_ids;
-            map<symbol_code, name>              contracts;
-
-            uint64_t primary_key() const { return base.get_symbol().code().raw(); }
-        };
-        typedef eosio::multi_index< "pizza"_n, pizza_row > pizza_table;
-
         struct schema {
             extended_symbol                    base;
             map<extended_symbol, string>       quotes;
@@ -145,25 +100,7 @@ namespace sx {
         typedef eosio::multi_index< "vigor.sx"_n, vigor_sx_row > vigor_sx_table;
 
         /**
-         * ## TABLE `global`
-         *
-         * - `{set<name>} contracts` - exchange contracts
-         *
-         * ### example
-         *
-         * ```json
-         * {
-         *     "contracts": ["swap.sx", "vigor.sx", "stable.sx"]
-         * }
-         * ```
-         */
-        struct [[eosio::table("sx")]] sx_row {
-            set<name>         contracts;
-        };
-        typedef eosio::singleton< "sx"_n, sx_row > sx_table;
-
-        /**
-         * ## ACTION `setexchange`
+         * ## ACTION `update`
          *
          * Update exchange pairs
          *
@@ -177,7 +114,7 @@ namespace sx {
          * ### example
          *
          * ```bash
-         * cleos push action registry.sx update '["swap.sx", {"contract": "eosio.token", "quantity": "1000.0000 EOS"}]' -p registry.sx
+         * cleos push action registry.sx update '["swap.sx", ["1000.0000 EOS", "eosio.token"]]' -p registry.sx
          * ```
          */
         [[eosio::action]]
