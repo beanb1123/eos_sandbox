@@ -128,14 +128,14 @@ basic::tradeparams basic::get_defi_trade_data(asset tokens, symbol to){
   const uint8_t fee = defibox::get_fee();
 
   // calculate out price
-  const asset out = uniswap::get_amount_out( tokens, reserve_in, reserve_out, fee );
+  const asset out = tokens.amount ? uniswap::get_amount_out( tokens, reserve_in, reserve_out, fee ) : asset {0, out_sym};
 
   return {"swap.defi"_n, out, tcontract, "swap,0," + pair_id};
 }
 
 
 
-basic::tradeparams basic::get_dfs_trade_data(asset tokens, symbol to){
+basic::tradeparams basic::get_dfs_trade_data(asset tokens, symbol out_sym){
 
   sx::registry::defisswapcnt_table dfs_table( "registry.sx"_n, "registry.sx"_n.value );
 
@@ -144,7 +144,7 @@ basic::tradeparams basic::get_dfs_trade_data(asset tokens, symbol to){
   name tcontract = rowit->base.get_contract();
   string pair_id;
   for(auto& p: rowit->quotes){
-    if(p.first.get_symbol()==to){
+    if(p.first.get_symbol()==out_sym){
       pair_id = p.second; break;
     }
   }
@@ -155,14 +155,14 @@ basic::tradeparams basic::get_dfs_trade_data(asset tokens, symbol to){
   const uint8_t fee = dfs::get_fee();
 
   // calculate out price
-  const asset out = uniswap::get_amount_out( tokens, reserve_in, reserve_out, fee );
+  const asset out = tokens.amount ? uniswap::get_amount_out( tokens, reserve_in, reserve_out, fee ) : asset {0, out_sym};
 
   return {"defisswapcnt"_n, out, tcontract, "swap:" + pair_id+":0"};
 }
 
 
 
-basic::tradeparams basic::get_hbg_trade_data(asset tokens, symbol to){
+basic::tradeparams basic::get_hbg_trade_data(asset tokens, symbol out_sym){
 
   sx::registry::hamburgerswp_table hbg_table( "registry.sx"_n, "registry.sx"_n.value );
 
@@ -171,7 +171,7 @@ basic::tradeparams basic::get_hbg_trade_data(asset tokens, symbol to){
   name tcontract = rowit->base.get_contract();
   string pair_id;
   for(auto& p: rowit->quotes){
-    if(p.first.get_symbol()==to){
+    if(p.first.get_symbol()==out_sym){
       pair_id = p.second; break;
     }
   }
@@ -183,12 +183,12 @@ basic::tradeparams basic::get_hbg_trade_data(asset tokens, symbol to){
   const uint8_t fee = hamburger::get_fee();
 
   // calculate out price
-  const asset out = uniswap::get_amount_out( tokens, reserve_in, reserve_out, fee );
+  const asset out = tokens.amount ? uniswap::get_amount_out( tokens, reserve_in, reserve_out, fee ) : asset {0, out_sym};
 
   return {"hamburgerswp"_n, out, tcontract, "swap:" + pair_id};
 }
 
-basic::tradeparams basic::get_pizza_trade_data(asset tokens, symbol to){
+basic::tradeparams basic::get_pizza_trade_data(asset tokens, symbol out_sym){
 
   sx::registry::pzaswapcntct_table pz_table( "registry.sx"_n, "registry.sx"_n.value );
 
@@ -197,7 +197,7 @@ basic::tradeparams basic::get_pizza_trade_data(asset tokens, symbol to){
   name tcontract = rowit->base.get_contract();
   string pair_id;
   for(auto& p: rowit->quotes){
-    if(p.first.get_symbol()==to){
+    if(p.first.get_symbol()==out_sym){
       pair_id = p.second; break;
     }
   }
@@ -208,13 +208,13 @@ basic::tradeparams basic::get_pizza_trade_data(asset tokens, symbol to){
   const uint8_t fee = pizza::get_fee();
 
   // calculate out price
-  const asset out = uniswap::get_amount_out( tokens, reserve_in, reserve_out, fee );
+  const asset out = tokens.amount ? uniswap::get_amount_out( tokens, reserve_in, reserve_out, fee ) : asset {0, out_sym};
 
   return {"pzaswapcntct"_n, out, tcontract, name{pair_id}.to_string()+"-swap-0"};
 }
 
 
-basic::tradeparams basic::get_swapsx_trade_data(asset tokens, symbol to){
+basic::tradeparams basic::get_swapsx_trade_data(asset tokens, symbol out_sym){
 
   sx::registry::swap_sx_table swap_sx_table( "registry.sx"_n, "registry.sx"_n.value );
 
@@ -222,13 +222,13 @@ basic::tradeparams basic::get_swapsx_trade_data(asset tokens, symbol to){
   if(rowit==swap_sx_table.end()) return {};
   name tcontract = "null"_n;
   for(auto& p: rowit->quotes){
-    if(p.first.get_symbol()==to){
+    if(p.first.get_symbol()==out_sym){
       tcontract = rowit->base.get_contract(); break;
     }
   }
   if(tcontract=="null"_n) return {};
 
-  asset out = swapSx::get_amount_out( "swap.sx"_n, tokens, to.code() );
+  const asset out = tokens.amount? swapSx::get_amount_out( "swap.sx"_n, tokens, out_sym.code() ) : asset {0, out_sym};
 
   return {"swap.sx"_n, out, tcontract, to.code().to_string()};
 }
@@ -247,12 +247,12 @@ basic::tradeparams basic::get_stablesx_trade_data(asset tokens, symbol to){
   }
   if(tcontract=="null"_n) return {};
 
-  asset out = swapSx::get_amount_out( "stable.sx"_n, tokens, to.code() );
+  const asset out = tokens.amount ? swapSx::get_amount_out( "stable.sx"_n, tokens, out_sym.code() ) : asset {0, out_sym};
 
   return {"stable.sx"_n, out, tcontract, to.code().to_string()};
 }
 
-basic::tradeparams basic::get_vigorsx_trade_data(asset tokens, symbol to){
+basic::tradeparams basic::get_vigorsx_trade_data(asset tokens, symbol out_sym){
 
   sx::registry::vigor_sx_table vigor_sx_table( "registry.sx"_n, "registry.sx"_n.value );
 
@@ -260,18 +260,18 @@ basic::tradeparams basic::get_vigorsx_trade_data(asset tokens, symbol to){
   if(rowit==vigor_sx_table.end()) return {};
   name tcontract="null"_n;
   for(auto& p: rowit->quotes){
-    if(p.first.get_symbol()==to){
+    if(p.first.get_symbol()==out_sym){
       tcontract = rowit->base.get_contract(); break;
     }
   }
   if(tcontract=="null"_n) return {};
 
-  asset out = swapSx::get_amount_out( "vigor.sx"_n, tokens, to.code() );
+  const asset out = tokens.amount ? swapSx::get_amount_out( "vigor.sx"_n, tokens, to.code() ) : asset {0, out_sym};
 
   return {"vigor.sx"_n, out, tcontract, to.code().to_string()};
 }
 
-basic::tradeparams basic::get_sapex_trade_data(asset tokens, symbol to){
+basic::tradeparams basic::get_sapex_trade_data(asset tokens, symbol out_sym){
 
   sx::registry::sapexamm_eo_table sapexamm_eo_table( "registry.sx"_n, "registry.sx"_n.value );
 
@@ -279,7 +279,7 @@ basic::tradeparams basic::get_sapex_trade_data(asset tokens, symbol to){
   if(rowit==sapexamm_eo_table.end()) return {};
   name tcontract="null"_n;
   for(auto& p: rowit->quotes){
-    if(p.first.get_symbol()==to){
+    if(p.first.get_symbol()==out_sym){
       tcontract = rowit->base.get_contract(); break;
     }
   }
@@ -289,7 +289,7 @@ basic::tradeparams basic::get_sapex_trade_data(asset tokens, symbol to){
   const auto [ reserve_in, reserve_out ] = sapex::get_reserves(tokens.symbol, to);
   const uint8_t fee = sapex::get_fee(tokens.symbol, to);
 
-  asset out = uniswap::get_amount_out( tokens, reserve_in, reserve_out, fee );
+  const asset out = tokens.amount ? uniswap::get_amount_out( tokens, reserve_in, reserve_out, fee ) : asset {0, out_sym};
 
   return {"sapexamm.eo"_n, out, tcontract, to.code().to_string()};
 }
