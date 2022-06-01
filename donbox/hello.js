@@ -103,63 +103,6 @@ class swapRouter {
     this.isInit = true;
   }
 
-let pair_market_map = {};
-let mid_market_map = {};
-let tokens = [];
-let paths = [];
-
-markets.map(x => {
-  let tokenA = x.contract0 + ":" + x.sym0;
-  let tokenB = x.contract1 + ":" + x.sym1;
-
-  let pair_a = tokenA + "-" + tokenB;
-  let pair_b = tokenB + "-" + tokenA;
-
-  pair_market_map[pair_a] = x;
-  pair_market_map[pair_b] = x;
-
-  mid_market_map[x.mid] = x;
-
-  paths.push(pair_a);
-  paths.push(pair_b);
-
-  let new_paths = []
-
-  for (let i = inum; i < paths.length; i++) { if (i > 10) { break; }
-
-    let path = paths[i];
-    let tks = path.split("-");
-    if (tks[0] === tokenA && tks[tks.length - 1] !== tokenB) {
-      new_paths.push(tokenB + "-" + path)
-    }
-
-    if (tks[tks.length - 1] === tokenA && tks[0] !== tokenB) {
-      new_paths.push(path + "-" + tokenB);
-    }
-
-    if (tks[0] === tokenB && tks[tks.length - 1] !== tokenA) {
-      new_paths.push(tokenA + "-" + path)
-    }
-
-    if (tks[tks.length - 1] === tokenB && tks[0] !== tokenA) {
-      new_paths.push(path + "-" + tokenA);
-    }
-  }
-
-  paths = paths.concat(new_paths);
-
-  if (tokens.indexOf(tokenA) === -1) {
-    tokens.push(tokenA)
-  }
-  if (tokens.indexOf(tokenB) === -1) {
-    tokens.push(tokenB)
-  }
-})
-
-paths = paths.sort((a, b) => {
-  return a.length - b.length;
-})
-
   get_paths(tokenA, tokenB, type) {
     const newTokenA = type === 'pay' ? tokenA : tokenB
     const newTokenB = type === 'pay' ? tokenB : tokenA
