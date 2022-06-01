@@ -1,109 +1,203 @@
-var { abc } = require('./data');
-var { inum } = require('./itr');
+let markets = [{
+    "mid": 1,
+    "contract0": "eosio.token",
+    "contract1": "tethertether",
+    "sym0": "4,EOS",
+    "sym1": "4,USDT",
+    "reserve0": "795.5128 EOS",
+    "reserve1": "3117.9301 USDT",
+    "liquidity_token": 15744553,
+    "price0_last": "3.90030000000000010",
+    "price1_last": "0.25629999999999997",
+    "price0_cumulative_last": 3952316795,
+    "price1_cumulative_last": 386026205,
+    "last_update": "2020-07-10T16:51:30"
+}, {
+    "mid": 2,
+    "contract0": "eosio.token",
+    "contract1": "vig111111111",
+    "sym0": "4,EOS",
+    "sym1": "4,VIG",
+    "reserve0": "3021.4198 EOS",
+    "reserve1": "8112.4886 VIG",
+    "liquidity_token": 49506781,
+    "price0_last": "2.68500000000000005",
+    "price1_last": "0.37240000000000001",
+    "price0_cumulative_last": 2277633544,
+    "price1_cumulative_last": 312222703,
+    "last_update": "2020-07-10T06:13:55"
+}, {
+    "mid": 3,
+    "contract0": "eosio.token",
+    "contract1": "newdexissuer",
+    "sym0": "4,EOS",
+    "sym1": "4,NDX",
+    "reserve0": "1084.5102 EOS",
+    "reserve1": "2506.3712 NDX",
+    "liquidity_token": 16481750,
+    "price0_last": "2.29829999999999979",
+    "price1_last": "0.43500000000000000",
+    "price0_cumulative_last": 2623031203,
+    "price1_cumulative_last": 397033050,
+    "last_update": "2020-07-10T11:07:01"
+}, {
+    "mid": 5,
+    "contract0": "eosio.token",
+    "contract1": "eosiotptoken",
+    "sym0": "4,EOS",
+    "sym1": "4,TPT",
+    "reserve0": "2012.6940 EOS",
+    "reserve1": "5413.6523 TPT",
+    "liquidity_token": 33007854,
+    "price0_last": "2.69260000000000010",
+    "price1_last": "0.37130000000000002",
+    "price0_cumulative_last": 83229859,
+    "price1_cumulative_last": 11219542,
+    "last_update": "2020-07-09T07:39:21"
+}, {
+    "mid": 7,
+    "contract0": "eosio.token",
+    "contract1": "everipediaiq",
+    "sym0": "4,EOS",
+    "sym1": "3,IQ",
+    "reserve0": "1014.8313 EOS",
+    "reserve1": "26735.695 IQ",
+    "liquidity_token": 16471552,
+    "price0_last": "2.64449999999999985",
+    "price1_last": "0.37809999999999999",
+    "price0_cumulative_last": 5895685,
+    "price1_cumulative_last": 820849,
+    "last_update": "2020-07-10T16:51:30"
+}, {
+    "mid": 9,
+    "contract0": "newdexissuer",
+    "contract1": "bgbgbgbgbgbg",
+    "sym0": "4,NDX",
+    "sym1": "4,BG",
+    "reserve0": "27131.2040 NDX",
+    "reserve1": "2731.2041 BG",
+    "liquidity_token": 86081853,
+    "price0_last": "0.00000000000000000",
+    "price1_last": "0.00000000000000000",
+    "price0_cumulative_last": 0,
+    "price1_cumulative_last": 0,
+    "last_update": "2020-07-11T02:36:32"
+}, {
+    "mid": 10,
+    "contract0": "bgbgbgbgbgbg",
+    "contract1": "mkstaketoken",
+    "sym0": "4,BG",
+    "sym1": "4,KEY",
+    "reserve0": "27131.2040 BG",
+    "reserve1": "2731.2041 KEY",
+    "liquidity_token": 86081853,
+    "price0_last": "0.00000000000000000",
+    "price1_last": "0.00000000000000000",
+    "price0_cumulative_last": 0,
+    "price1_cumulative_last": 0,
+    "last_update": "2020-07-11T02:36:36"
+}
+]
 
-console.log(inum);
-let markets = abc
+let pair_market_map = {};
+let mid_market_map = {};
+let tokens = [];
+let paths = [];
 
-class swapRouter {
-  constructor() {
-    this.markets = [];
-    this.pair_market_map = {};
-    this.mid_market_map = {};
-    this.tokens = [];
-    this.paths = [];
-    this.isInit = false;
-    this._pathsArr = [];
-    this.bestPath = '';
-    this.doing = false; // 正在初始化中
+markets.map(x => {
+    let tokenA = x.contract0 + ":" + x.sym0.split(",")[1];
+    let tokenB = x.contract1 + ":" + x.sym1.split(",")[1];
 
-    // 保存上一次生成路径的两个币种信息
-    this.token0 = '';
-    this.token1 = '';
-  }
-  init(data, vThis, market0, market1) {
-    this.markets = data || [];
-    this._pathsArr = [];
-    this.bestPath = '';
-    const token0 = `${market0.contract}:${market0.symbol}`;
-    const token1 = `${market1.contract}:${market1.symbol}`;
-    if ((this.token0 === token0 && this.token1 === token1)) {
-      return
-    }
-    this.token0 = token0;
-    this.token1 = token1;
-    // if (this.paths.length || this.doing) {
-    //   return
-    // }
-    // this.doing = true;
-    if (window.Worker) {
-      this.workerToInitPath(vThis, token0, token1)
-    } else {
-      this.initPath()
-    }
-  }
+    let pair_a = tokenA + "-" + tokenB;
+    let pair_b = tokenB + "-" + tokenA;
 
-  initPath() {
-    this.paths = [];
-    this.pair_market_map = {};
-    this.mid_market_map = {};
-    this.tokens = [];
-    this.markets.map(x => {
-      let tokenA = x.contract0 + ":" + x.sym0.split(",")[1];
-      let tokenB = x.contract1 + ":" + x.sym1.split(",")[1];
-      let pair_a = tokenA + "-" + tokenB;
-      let pair_b = tokenB + "-" + tokenA;
+    pair_market_map[pair_a] = x;
+    pair_market_map[pair_b] = x;
 
-      this.pair_market_map[pair_a] = x;
-      this.pair_market_map[pair_b] = x;
+    mid_market_map[x.mid] = x;
 
-      this.mid_market_map[x.mid] = x;
+    paths.push(pair_a);
+    paths.push(pair_b);
 
-      this.paths.push(pair_a);
-      this.paths.push(pair_b);
+    let new_paths = []
 
-      let new_paths = []
-
-      for (let i = 0; i < this.paths.length; i++) {
-        let path = this.paths[i];
+    for (let i = 0; i < paths.length; i++) {
+        let path = paths[i];
         let tks = path.split("-");
-        if (tks.length >= 3) {
-          continue
-        }
         if (tks[0] === tokenA && tks[tks.length - 1] !== tokenB) {
-          new_paths.push(tokenB + "-" + path)
+            new_paths.push(tokenB + "-" + path)
         }
 
         if (tks[tks.length - 1] === tokenA && tks[0] !== tokenB) {
-          new_paths.push(path + "-" + tokenB);
+            new_paths.push(path + "-" + tokenB);
         }
 
         if (tks[0] === tokenB && tks[tks.length - 1] !== tokenA) {
-          new_paths.push(tokenA + "-" + path)
+            new_paths.push(tokenA + "-" + path)
         }
 
         if (tks[tks.length - 1] === tokenB && tks[0] !== tokenA) {
-          new_paths.push(path + "-" + tokenA);
+            new_paths.push(path + "-" + tokenA);
         }
-      }
+    }
 
-      this.paths = this.paths.concat(new_paths);
+    paths = paths.concat(new_paths);
 
-      if (this.tokens.indexOf(tokenA) === -1) {
-        this.tokens.push(tokenA)
-      }
-      if (this.tokens.indexOf(tokenB) === -1) {
-        this.tokens.push(tokenB)
-      }
-    })
-    // console.log("tokens", this.tokens);
-    this.paths = this.paths.sort((a, b) => {
-      return a.length - b.length;
-    })
-    // console.log("paths", this.paths);
-    this.isInit = true;
-  }
+    if (tokens.indexOf(tokenA) === -1) {
+        tokens.push(tokenA)
+    }
+    if (tokens.indexOf(tokenB) === -1) {
+        tokens.push(tokenB)
+    }
+})
 
-  get_paths(tokenA, tokenB, type) {
+console.log("tokens", tokens);
+
+paths = paths.sort((a, b) => {
+    return a.length - b.length;
+})
+
+console.log("paths", paths);
+
+function get_paths(tokenA, tokenB) {
+    let pair = [tokenA, tokenB].sort().join("-");
+
+    let market = pair_market_map[pair];
+
+    let _paths;
+
+    if (market) {
+        _paths = pair;
+    } else {
+        for (let i = 0; i < paths.length; i++) {
+            let path = paths[i];
+            let tks = path.split("-");
+            if ((tks[0] === tokenA && tks[tks.length - 1] === tokenB)) {
+                _paths = path;
+                break;
+            }
+        }
+    }
+    let mids;
+
+    let tks = _paths.split("-");
+
+    for (let i = 0; i < tks.length - 1; i++) {
+        let pair = tks[i] + "-" + tks[i + 1]
+        if (!mids) {
+            mids = pair_market_map[pair].mid;
+        } else {
+            mids = mids + "-" + pair_market_map[pair].mid;
+        }
+    }
+
+    // 根据兑换路径, 找出对应的mid路径
+    console.log(_paths, mids);
+
+    return mids + "";
+}
+
+function get_paths(tokenA, tokenB, type) {
     const newTokenA = type === 'pay' ? tokenA : tokenB
     const newTokenB = type === 'pay' ? tokenB : tokenA
     if (!this.isInit) return;
@@ -143,8 +237,21 @@ class swapRouter {
     return _pathsMids;
   }
 
+// 计算兑换路径
+let mids1 = get_paths("eosio.token:EOS", "everipediaiq:IQ");  // 直接兑换    EOS-IQ
+let mids2 = get_paths("eosiotptoken:TPT", "everipediaiq:IQ"); // 中转兑换1次 TPT-EOS-IQ
+let mids3 = get_paths("eosio.token:EOS", "bgbgbgbgbgbg:BG");  // 中转兑换1次 EOS-NDX-BG
+let mids4 = get_paths("eosio.token:EOS", "mkstaketoken:KEY"); // 中转兑换2次 EOS-NDX-BG-KEY
+
+
+// 计算amount_out 
+get_amounts_out(mids1, "eosio.token:EOS", 100000); // 10 EOS ->  260.104 IQ
+get_amounts_out(mids2, "eosiotptoken:TPT", 100000);// 10 EOS -> 3.6999 EOS -> 96.828 IQ
+get_amounts_out(mids3, "eosio.token:EOS", 100000); // 10 EOS -> 22.8315 NDX -> 2.2896 BG
+get_amounts_out(mids4, "eosio.token:EOS", 100000); // 10 EOS -> 22.8315 NDX -> 2.2896 BG -> 0.2298 KEY
+
   //  mids = [], token_in = eosio.token:EOS, amount_in = 10000, type = 'pay' | 'get'
-  get_amounts_out(mids, token_in, amount_in, type) {
+function get_amounts_out(mids, token_in, amount_in, type) {
     if (!this.isInit) return;
     let amounts_out_arr = [];
     let hasMids = 0;
@@ -204,7 +311,7 @@ class swapRouter {
     return amounts_out_arr[0]
   }
 
-  swap(mid, token_in, amount_in, type) {
+function swap(mid, token_in, amount_in, type) {
     if (!this.isInit) return;
     let market = this.markets.find(v => v.mid == mid);
     if (!market) {
@@ -303,45 +410,21 @@ class swapRouter {
     }
   }
 
-  get_amount_out(amount_in, reserve_in, reserve_out) {
-    if (!this.isInit) return 0;
-    if (!(amount_in > 0)) {
-      return 0
-    }
-    let amount_in_with_fee = amount_in * (10000 - 20); // 去除手续费后总输入
+function get_amount_out(amount_in, reserve_in, reserve_out) {
+    check(amount_in > 0, "invalid input amount");
+    check(reserve_in > 0 && reserve_out > 0, "insufficient liquidity");
+
+    let amount_in_with_fee = amount_in * (10000 - 20);
     let numerator = amount_in_with_fee * reserve_out;
     let denominator = reserve_in * 10000 + amount_in_with_fee;
     let amount_out = numerator / denominator;
-    if (!(amount_out > 0)) {
-      return 0
-    }
+
+    check(amount_out > 0, "invalid output amount");
     return amount_out;
-  }
-  // 根据获得计算输入
-  get_amount_in(amount_out, reserve_in, reserve_out) {
-    if (!this.isInit) return 0;
-    if (!(amount_out > 0)) {
-      return 0
-    }
-    // let numerator = reserve_in * amount_out;
-    // let denominator = reserve_out - amount_out;
-    // let amount_in_with_fee = numerator / denominator;
-    // let amount_in = amount_in_with_fee * 10000 / (10000 - 20);
+}
 
-    let amount_in_with_fee = amount_out * 10000; // 去除手续费后总输入
-    let numerator = amount_in_with_fee * reserve_out;
-    let denominator = reserve_in * 10000 - amount_in_with_fee;
-    let amount_in = numerator / denominator;
-    amount_in = amount_in / 0.997
-    if (!(amount_in > 0)) {
-      return 0
-    }
-    return amount_in;
-  }
-
-  check(condition, message) {
+function check(condition, message) {
     if (!condition) {
-      throw new Error(message);
+        throw new Error(message);
     }
-  }
 }
