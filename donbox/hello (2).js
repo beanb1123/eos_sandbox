@@ -61,121 +61,245 @@ paths = paths.sort((a, b) => {
   return a.length - b.length;
 })
 
-function get_paths(tokenA, tokenB) {
-  let pair = [tokenA, tokenB].sort().join("-");
+  get_paths(tokenA, tokenB, type) {
+    const newTokenA = type === 'pay' ? tokenA : tokenB
+    const newTokenB = type === 'pay' ? tokenB : tokenA
+    if (!this.isInit) return;
+    let _paths;
+    const _pathsArr = [];
 
-  let market = pair_market_map[pair];
-
-  let _paths;
-
-  if (market) {
-    _paths = pair;
-  } else {
-    for (let i = 0; i < paths.length; i++) {
-      let path = paths[i];
+    for (let i = 0; i < this.paths.length; i++) {
+      // if (_pathsArr.length === 10) {
+      //   break
+      // }
+      let path = this.paths[i];
       let tks = path.split("-");
-      if ((tks[0] === tokenA && tks[tks.length - 1] === tokenB)) {
+      if ((tks[0] === newTokenA && tks[tks.length - 1] === newTokenB)) {
         _paths = path;
-        break;
+        _pathsArr.push(_paths)
       }
     }
+    // 根据兑换路径, 找出对应的mid路径
+    this._pathsArr = _pathsArr; // 查到所有路径 - 合约路径
+    const _pathsMids = [];
+    _pathsArr.forEach((v) => {
+      let mids;
+      let tks = v.split("-");
+
+      for (let i = 0; i < tks.length - 1; i++) {
+        let pair = tks[i] + "-" + tks[i + 1]
+        if (!mids) {
+          mids = this.pair_market_map[pair].mid;
+        } else {
+          mids = mids + "-" + this.pair_market_map[pair].mid;
+        }
+      }
+      _pathsMids.push(mids + '') // 返回所有Mid路径
+    })
+    // console.log(_pathsMids)
+    // return [_pathsMids[0]];
+    return _pathsMids;
   }
-  let mids;
 
-  let tks = _paths.split("-");
-
-  for (let i = 0; i < tks.length - 1; i++) {
-    let pair = tks[i] + "-" + tks[i + 1]
-    if (!mids) {
-      mids = pair_market_map[pair].mid;
+  //  mids = [], token_in = eosio.token:EOS, amount_in = 10000, type = 'pay' | 'get'
+  get_amounts_out(mids, token_in, amount_in, type) {
+    if (!this.isInit) return;
+    let amounts_out_arr = [];
+    let hasMids = 0;
+    mids.forEach((m, mIndex) => {
+      let mid_arr = m.split("-");
+      if (mid_arr.length === 1) {
+        hasMids = mid_arr[0]
+      }
+      let quantity_out;
+      let price = 1;
+      let swapInPrice = 1;
+      let swapOutPrice = 1;
+      let new_token_in = token_in, new_amount_in = amount_in;
+      // console.log(' --------------------- ')
+      for (let i = 0; i < mid_arr.length; i++) {
+        let mid = mid_arr[i];
+        // console.log('mid', mid)
+        let market = this.markets.find(v => v.mid == mid);
+        if (!market) {
+          return
+        }
+        let swap_result
+        if (!type) {
+          swap_result = this.swap(mid, new_token_in, new_amount_in);
+        } else {
+          swap_result = this.swap(mid, new_token_in, new_amount_in, type);
+        }
+        new_amount_in = swap_result.amount_out;
+        new_token_in = swap_result.token_out;
+        quantity_out = swap_result.quantity_out;
+        price = swap_result.price * price;
+        swapInPrice = swap_result.swapInPrice * swapInPrice;
+        swapOutPrice = swap_result.swapOutPrice * swapOutPrice;
+      }
+      amounts_out_arr.push({
+        amount_in: new_amount_in, token_in: new_token_in, quantity_out, price, mid: m, mIndex,
+        swapInPrice, swapOutPrice,
+      })
+    })
+    if (!type) {
+      amounts_out_arr.sort((a, b) => {
+        return parseFloat(b.quantity_out) - parseFloat(a.quantity_out);
+      })
     } else {
-      mids = mids + "-" + pair_market_map[pair].mid;
+      amounts_out_arr = amounts_out_arr.filter(v => v.amount_in > 0)
+      amounts_out_arr.sort((a, b) => {
+        return parseFloat(a.quantity_out) - parseFloat(b.quantity_out);
+      })
+    }
+    if (!amounts_out_arr.length) {
+      return {}
+    }
+    this.bestPath = this._pathsArr[amounts_out_arr[0].mIndex]
+    amounts_out_arr[0].bestPath = this.bestPath;
+    amounts_out_arr[0].hasMids = hasMids;
+
+    return amounts_out_arr[0]
+  }
+
+  swap(mid, token_in, amount_in, type) {
+    if (!this.isInit) return;
+    let market = this.markets.find(v => v.mid == mid);
+    if (!market) {
+      return
+    }
+    let tokenA = market.contract0 + ":" + market.sym0.split(",")[1];
+    let tokenB = market.contract1 + ":" + market.sym1.split(",")[1];
+    let inNum = amount_in;
+    if (!type) {
+      amount_in -= amount_in * 0.001; // 协议费扣除
+      inNum = amount_in * 0.998;
+    }
+    let amount_out;
+    let token_out;
+    let quantity_out;
+    let price;
+    let swapPrice; // 兑换后的价格
+    if (token_in === tokenA) {
+      inNum = inNum / (10 ** market.sym0.split(",")[0]);
+      let reserve_in = parseFloat(market.reserve0) * (10 ** market.sym0.split(",")[0]);
+      let reserve_out = parseFloat(market.reserve1) * (10 ** market.sym1.split(",")[0]);
+      if (!(reserve_in > 0 && reserve_out > 0)) {
+        return {
+          token_out: tokenB,
+          amount_out: '0',
+          quantity_out: '0',
+          price: '0'
+        }
+      }
+      if (!type) {
+        amount_out = this.get_amount_out(amount_in, reserve_in, reserve_out);
+      } else {
+        amount_out = this.get_amount_in(amount_in, reserve_in, reserve_out);
+      }
+      token_out = tokenB
+      // console.log('tokenA' ,amount_out)
+      quantity_out = toFixed((amount_out / (10 ** market.sym1.split(",")[0])), market.sym1.split(",")[0]) + " " + market.reserve1.split(" ")[1];
+      if (!type) {
+        price = parseFloat(market.reserve1) / parseFloat(market.reserve0);
+      } else {
+        price = parseFloat(market.reserve0) / parseFloat(market.reserve1);
+      }
+      swapPrice = accDiv(amount_out, 10 ** market.sym1.split(",")[0]); // 计算总输出 - 不截取
+      // console.log('1 ----- ', quantity_out, ' ------- ', price)
+    }
+    if (token_in === tokenB) {
+      inNum = inNum / (10 ** market.sym1.split(",")[0]);
+      let reserve_in = parseFloat(market.reserve1) * (10 ** market.sym1.split(",")[0]);
+      let reserve_out = parseFloat(market.reserve0) * (10 ** market.sym0.split(",")[0]);
+      if (!(reserve_in > 0 && reserve_out > 0)) {
+        return {
+          token_out: tokenA,
+          amount_out: '0',
+          quantity_out: '0',
+          price: '0'
+        }
+      }
+      if (!type) {
+        amount_out = this.get_amount_out(amount_in, reserve_in, reserve_out);
+      } else {
+        amount_out = this.get_amount_in(amount_in, reserve_in, reserve_out);
+      }
+      token_out = tokenA;
+      // console.log('tokenB' ,amount_out)
+      quantity_out = toFixed((amount_out / (10 ** market.sym0.split(",")[0])), (market.sym0.split(",")[0])) + " " + market.reserve0.split(" ")[1];
+      if (!type) {
+        price = parseFloat(market.reserve0) / parseFloat(market.reserve1);
+      } else {
+        price = parseFloat(market.reserve1) / parseFloat(market.reserve0);
+      }
+      // console.log(reserve_out, reserve_in)
+      swapPrice = accDiv(amount_out, 10 ** market.sym0.split(",")[0]); // 计算总输出 - 不截取
+      // console.log('2 ----- ', quantity_out, ' ------- ', price)
+    }
+    // console.log('swapPrice', swapPrice)
+    let swapInPrice, swapOutPrice;
+    if (!type) {
+      swapInPrice = swapPrice / inNum;
+      swapOutPrice = inNum / swapPrice;
+      // console.log(amount_out, inNum, swapPrice)
+    } else {
+      // const noFeesAmt = accMul(amount_out, 0.998);
+      // swapPrice = accDiv(noFeesAmt, 10 ** market.sym0.split(",")[0]); // 计算总输出 - 不截取
+      swapPrice = swapPrice * 0.997;
+      swapInPrice = inNum / swapPrice;
+      swapOutPrice = swapPrice / inNum;
+    }
+    // console.log(swapInPrice, inNum, price)
+    return {
+      token_out,
+      amount_out,
+      quantity_out,
+      price,
+      swapInPrice,
+      swapOutPrice
     }
   }
 
-  console.log(_paths, mids);
-
-  return mids + "";
-}
-
-// 计算兑换路径
-let mids3 = get_paths("eosiotoken:WAX2", "eosio.token:WAX");
-
-get_amounts_out(mids3, "eosiotoken:WAX2", 100000000);
-
-
-
-
-function get_amounts_out(mids, token_in, amount_in) {
-  let mid_arr = mids.split("-");
-
-  for (let i = 0; i < 10; i++) { if (i > mid_arr.length - 1) { break; }
-
-    let mid = mid_arr[i];
-    let swap_result = swap(mid, token_in, amount_in);
-
-    amount_in = swap_result.amount_out;
-    token_in = swap_result.token_out;
-    quantity_out = swap_result.quantity_out;
+  get_amount_out(amount_in, reserve_in, reserve_out) {
+    if (!this.isInit) return 0;
+    if (!(amount_in > 0)) {
+      return 0
+    }
+    let amount_in_with_fee = amount_in * (10000 - 20); // 去除手续费后总输入
+    let numerator = amount_in_with_fee * reserve_out;
+    let denominator = reserve_in * 10000 + amount_in_with_fee;
+    let amount_out = numerator / denominator;
+    if (!(amount_out > 0)) {
+      return 0
+    }
+    return amount_out;
   }
-  console.log(amount_in, token_in, quantity_out);
-}
+  // 根据获得计算输入
+  get_amount_in(amount_out, reserve_in, reserve_out) {
+    if (!this.isInit) return 0;
+    if (!(amount_out > 0)) {
+      return 0
+    }
+    // let numerator = reserve_in * amount_out;
+    // let denominator = reserve_out - amount_out;
+    // let amount_in_with_fee = numerator / denominator;
+    // let amount_in = amount_in_with_fee * 10000 / (10000 - 20);
 
-function swap(mid, token_in, amount_in) {
-  let market = mid_market_map[mid];
-
-  let tokenA = market.contract0 + ":" + market.sym0;
-  let tokenB = market.contract1 + ":" + market.sym1;
-  let precA = market.reserve0.split(" ")[0].split(".")[1].length;
-  let precB = market.reserve1.split(" ")[0].split(".")[1].length;
-
-
-  amount_in -= amount_in * 0.001; // 协议费扣除
-  let amount_out;
-  let token_out;
-  let quantity_out;
-
-  if (token_in === tokenA) {
-    let reserve_in = parseFloat(market.reserve0) * (10 ** precA);
-    let reserve_out = parseFloat(market.reserve1) * (10 ** precB);
-    amount_out = get_amount_out(amount_in, reserve_in, reserve_out);
-
-    token_out = tokenB;
-    quantity_out = (amount_out / (10 ** precB)).toFixed(precB) + " " + market.reserve1.split(" ")[1];
-	  console.log("quantity_out:", quantity_out);
-  }
-  if (token_in === tokenB) {
-    let reserve_in = parseFloat(market.reserve1) * (10 ** precB);
-    let reserve_out = parseFloat(market.reserve0) * (10 ** precA);
-    amount_out = get_amount_out(amount_in, reserve_in, reserve_out);
-
-    token_out = tokenA;
-    quantity_out = (amount_out / (10 ** precA)).toFixed(precA) + " " + market.reserve0.split(" ")[1];
-	  console.log("quantity_out:", quantity_out);
+    let amount_in_with_fee = amount_out * 10000; // 去除手续费后总输入
+    let numerator = amount_in_with_fee * reserve_out;
+    let denominator = reserve_in * 10000 - amount_in_with_fee;
+    let amount_in = numerator / denominator;
+    amount_in = amount_in / 0.997
+    if (!(amount_in > 0)) {
+      return 0
+    }
+    return amount_in;
   }
 
-  return {
-    token_out,
-    amount_out,
-    quantity_out
-  }
-}
-
-function get_amount_out(amount_in, reserve_in, reserve_out) {
-  check(amount_in > 0, "invalid input amount");
-  check(reserve_in > 0 && reserve_out > 0, "insufficient liquidity");
-
-  let amount_in_with_fee = amount_in * (10000 - 20);
-  let numerator = amount_in_with_fee * reserve_out;
-  let denominator = reserve_in * 10000 + amount_in_with_fee;
-  let amount_out = numerator / denominator;
-
-  check(amount_out > 0, "invalid output amount");
-  return amount_out;
-}
-
-function check(condition, message) {
-  if (!condition) {
-    throw new Error(message);
+  check(condition, message) {
+    if (!condition) {
+      throw new Error(message);
+    }
   }
 }
