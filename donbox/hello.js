@@ -277,8 +277,10 @@ function swap(mid, token_in, amount_in, type) {
     if (!market) {
       return
     }
-    let tokenA = market.contract0 + ":" + market.sym0.split(",")[1];
-    let tokenB = market.contract1 + ":" + market.sym1.split(",")[1];
+    let tokenA = market.contract0 + ":" + market.sym0;
+    let tokenB = market.contract1 + ":" + market.sym1;
+    let precA = market.reserve0.split(" ")[0].split(".")[1].length;
+    let precB = market.reserve1.split(" ")[0].split(".")[1].length;
     let inNum = amount_in;
     if (!type) {
       amount_in -= amount_in * 0.001; // 协议费扣除
@@ -290,9 +292,9 @@ function swap(mid, token_in, amount_in, type) {
     let price;
     let swapPrice; // 兑换后的价格
     if (token_in === tokenA) {
-      inNum = inNum / (10 ** market.sym0.split(",")[0]);
-      let reserve_in = parseFloat(market.reserve0) * (10 ** market.sym0.split(",")[0]);
-      let reserve_out = parseFloat(market.reserve1) * (10 ** market.sym1.split(",")[0]);
+      inNum = inNum / (10 ** precA);
+      let reserve_in = parseFloat(market.reserve0) * (10 ** precA);
+      let reserve_out = parseFloat(market.reserve1) * (10 ** precB);
       if (!(reserve_in > 0 && reserve_out > 0)) {
         return {
           token_out: tokenB,
@@ -307,20 +309,20 @@ function swap(mid, token_in, amount_in, type) {
         amount_out = this.get_amount_in(amount_in, reserve_in, reserve_out);
       }
       token_out = tokenB
-      // console.log('tokenA' ,amount_out)
-      quantity_out = toFixed((amount_out / (10 ** market.sym1.split(",")[0])), market.sym1.split(",")[0]) + " " + market.reserve1.split(" ")[1];
+       console.log('tokenA' ,amount_out)
+      quantity_out = toFixed((amount_out / (10 ** precB)), (precB)) + " " + market.reserve1.split(" ")[1];
       if (!type) {
         price = parseFloat(market.reserve1) / parseFloat(market.reserve0);
       } else {
         price = parseFloat(market.reserve0) / parseFloat(market.reserve1);
       }
-      swapPrice = accDiv(amount_out, 10 ** market.sym1.split(",")[0]); // 计算总输出 - 不截取
-      // console.log('1 ----- ', quantity_out, ' ------- ', price)
+      swapPrice = accDiv(amount_out, 10 ** precB); // 计算总输出 - 不截取
+       console.log('1 ----- ', quantity_out, ' ------- ', price)
     }
     if (token_in === tokenB) {
-      inNum = inNum / (10 ** market.sym1.split(",")[0]);
-      let reserve_in = parseFloat(market.reserve1) * (10 ** market.sym1.split(",")[0]);
-      let reserve_out = parseFloat(market.reserve0) * (10 ** market.sym0.split(",")[0]);
+      inNum = inNum / (10 ** precB);
+      let reserve_in = parseFloat(market.reserve1) * (10 ** precB);
+      let reserve_out = parseFloat(market.reserve0) * (10 ** precA);
       if (!(reserve_in > 0 && reserve_out > 0)) {
         return {
           token_out: tokenA,
@@ -335,16 +337,16 @@ function swap(mid, token_in, amount_in, type) {
         amount_out = this.get_amount_in(amount_in, reserve_in, reserve_out);
       }
       token_out = tokenA;
-      // console.log('tokenB' ,amount_out)
-      quantity_out = toFixed((amount_out / (10 ** market.sym0.split(",")[0])), (market.sym0.split(",")[0])) + " " + market.reserve0.split(" ")[1];
+       console.log('tokenB' ,amount_out)
+      quantity_out = toFixed((amount_out / (10 ** precA)), (precA)) + " " + market.reserve0.split(" ")[1];
       if (!type) {
         price = parseFloat(market.reserve0) / parseFloat(market.reserve1);
       } else {
         price = parseFloat(market.reserve1) / parseFloat(market.reserve0);
       }
       // console.log(reserve_out, reserve_in)
-      swapPrice = accDiv(amount_out, 10 ** market.sym0.split(",")[0]); // 计算总输出 - 不截取
-      // console.log('2 ----- ', quantity_out, ' ------- ', price)
+      swapPrice = accDiv(amount_out, 10 ** precA); // 计算总输出 - 不截取
+       console.log('2 ----- ', quantity_out, ' ------- ', price)
     }
     // console.log('swapPrice', swapPrice)
     let swapInPrice, swapOutPrice;
