@@ -159,43 +159,45 @@ paths = paths.sort((a, b) => {
 
 console.log("paths", paths);
 
-function get_paths(tokenA, tokenB) {
-    let pair = [tokenA, tokenB].sort().join("-");
-
-    let market = pair_market_map[pair];
-
+function get_paths(tokenA, tokenB, type) {
+    const newTokenA = type === 'pay' ? tokenA : tokenB
+    const newTokenB = type === 'pay' ? tokenB : tokenA
+    if (!this.isInit) return;
     let _paths;
+    const _pathsArr = [];
 
-    if (market) {
-        _paths = pair;
-    } else {
-        for (let i = 0; i < paths.length; i++) {
-            let path = paths[i];
-            let tks = path.split("-");
-            if ((tks[0] === tokenA && tks[tks.length - 1] === tokenB)) {
-                _paths = path;
-                break;
-            }
-        }
+    for (let i = 0; i < this.paths.length; i++) {
+      // if (_pathsArr.length === 10) {
+      //   break
+      // }
+      let path = this.paths[i];
+      let tks = path.split("-");
+      if ((tks[0] === newTokenA && tks[tks.length - 1] === newTokenB)) {
+        _paths = path;
+        _pathsArr.push(_paths)
+      }
     }
-    let mids;
+    // 根据兑换路径, 找出对应的mid路径
+    this._pathsArr = _pathsArr; // 查到所有路径 - 合约路径
+    const _pathsMids = [];
+    _pathsArr.forEach((v) => {
+      let mids;
+      let tks = v.split("-");
 
-    let tks = _paths.split("-");
-
-    for (let i = 0; i < tks.length - 1; i++) {
+      for (let i = 0; i < tks.length - 1; i++) {
         let pair = tks[i] + "-" + tks[i + 1]
         if (!mids) {
-            mids = pair_market_map[pair].mid;
+          mids = this.pair_market_map[pair].mid;
         } else {
-            mids = mids + "-" + pair_market_map[pair].mid;
+          mids = mids + "-" + this.pair_market_map[pair].mid;
         }
-    }
-
-    // 根据兑换路径, 找出对应的mid路径
-    console.log(_paths, mids);
-
-    return mids + "";
-}
+      }
+      _pathsMids.push(mids + '') // 返回所有Mid路径
+    })
+    // console.log(_pathsMids)
+    // return [_pathsMids[0]];
+    return _pathsMids;
+  }
 
 // 计算兑换路径
 let mids1 = get_paths("eosio.token:EOS", "everipediaiq:IQ");  // 直接兑换    EOS-IQ
