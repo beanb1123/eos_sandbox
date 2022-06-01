@@ -4,6 +4,105 @@ var { inum } = require('./itr');
 console.log(inum);
 let markets = abc
 
+class swapRouter {
+  constructor() {
+    this.markets = [];
+    this.pair_market_map = {};
+    this.mid_market_map = {};
+    this.tokens = [];
+    this.paths = [];
+    this.isInit = false;
+    this._pathsArr = [];
+    this.bestPath = '';
+    this.doing = false; // 正在初始化中
+
+    // 保存上一次生成路径的两个币种信息
+    this.token0 = '';
+    this.token1 = '';
+  }
+  init(data, vThis, market0, market1) {
+    this.markets = data || [];
+    this._pathsArr = [];
+    this.bestPath = '';
+    const token0 = `${market0.contract}:${market0.symbol}`;
+    const token1 = `${market1.contract}:${market1.symbol}`;
+    if ((this.token0 === token0 && this.token1 === token1)) {
+      return
+    }
+    this.token0 = token0;
+    this.token1 = token1;
+    // if (this.paths.length || this.doing) {
+    //   return
+    // }
+    // this.doing = true;
+    if (window.Worker) {
+      this.workerToInitPath(vThis, token0, token1)
+    } else {
+      this.initPath()
+    }
+  }
+
+  initPath() {
+    this.paths = [];
+    this.pair_market_map = {};
+    this.mid_market_map = {};
+    this.tokens = [];
+    this.markets.map(x => {
+      let tokenA = x.contract0 + ":" + x.sym0.split(",")[1];
+      let tokenB = x.contract1 + ":" + x.sym1.split(",")[1];
+      let pair_a = tokenA + "-" + tokenB;
+      let pair_b = tokenB + "-" + tokenA;
+
+      this.pair_market_map[pair_a] = x;
+      this.pair_market_map[pair_b] = x;
+
+      this.mid_market_map[x.mid] = x;
+
+      this.paths.push(pair_a);
+      this.paths.push(pair_b);
+
+      let new_paths = []
+
+      for (let i = 0; i < this.paths.length; i++) {
+        let path = this.paths[i];
+        let tks = path.split("-");
+        if (tks.length >= 3) {
+          continue
+        }
+        if (tks[0] === tokenA && tks[tks.length - 1] !== tokenB) {
+          new_paths.push(tokenB + "-" + path)
+        }
+
+        if (tks[tks.length - 1] === tokenA && tks[0] !== tokenB) {
+          new_paths.push(path + "-" + tokenB);
+        }
+
+        if (tks[0] === tokenB && tks[tks.length - 1] !== tokenA) {
+          new_paths.push(tokenA + "-" + path)
+        }
+
+        if (tks[tks.length - 1] === tokenB && tks[0] !== tokenA) {
+          new_paths.push(path + "-" + tokenA);
+        }
+      }
+
+      this.paths = this.paths.concat(new_paths);
+
+      if (this.tokens.indexOf(tokenA) === -1) {
+        this.tokens.push(tokenA)
+      }
+      if (this.tokens.indexOf(tokenB) === -1) {
+        this.tokens.push(tokenB)
+      }
+    })
+    // console.log("tokens", this.tokens);
+    this.paths = this.paths.sort((a, b) => {
+      return a.length - b.length;
+    })
+    // console.log("paths", this.paths);
+    this.isInit = true;
+  }
+
 let pair_market_map = {};
 let mid_market_map = {};
 let tokens = [];
