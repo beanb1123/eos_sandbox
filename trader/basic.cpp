@@ -8,10 +8,6 @@
 #include <dfs.hpp>
 #include <uniswap.hpp>
 #include <flash.sx.hpp>
-#include <swap.sx.hpp>
-#include <hamburger.hpp>
-#include <pizza.hpp>
-#include <sapex.hpp>
 
 
 #include "basic.hpp"
@@ -89,18 +85,6 @@ basic::tradeparams basic::get_trade_data(string exchange, asset tokens, symbol t
     return get_defi_trade_data(tokens, to);
   if(exchange == "dfs")
     return get_dfs_trade_data(tokens, to);
-  if(exchange == "swap.sx")
-    return get_swapsx_trade_data(tokens, to);
-  if(exchange == "stable.sx")
-    return get_stablesx_trade_data(tokens, to);
-  if(exchange == "vigor.sx")
-    return get_vigorsx_trade_data(tokens, to);
-  if(exchange == "hamburger")
-    return get_hbg_trade_data(tokens, to);
-  if(exchange == "pizza")
-    return get_pizza_trade_data(tokens, to);
-  if(exchange == "sapex")
-    return get_sapex_trade_data(tokens, to);
 
   check(false, exchange + " exchange is not supported");
   return {};  //dummy
@@ -161,139 +145,6 @@ basic::tradeparams basic::get_dfs_trade_data(asset tokens, symbol out_sym){
 }
 
 
-
-basic::tradeparams basic::get_hbg_trade_data(asset tokens, symbol out_sym){
-
-  sx::registry::hamburgerswp_table hbg_table( "registry.sx"_n, "registry.sx"_n.value );
-
-  auto rowit = hbg_table.find(tokens.symbol.code().raw());
-  if(rowit==hbg_table.end()) return {};
-  name tcontract = rowit->base.get_contract();
-  string pair_id;
-  for(auto& p: rowit->quotes){
-    if(p.first.get_symbol()==out_sym){
-      pair_id = p.second; break;
-    }
-  }
-  if(pair_id=="") return {};
-
-
-  // get reserves
-  const auto [ reserve_in, reserve_out ] = hamburger::get_reserves( stoi(pair_id), tokens.symbol );
-  const uint8_t fee = hamburger::get_fee();
-
-  // calculate out price
-  const asset out = tokens.amount ? uniswap::get_amount_out( tokens, reserve_in, reserve_out, fee ) : asset {0, out_sym};
-
-  return {"hamburgerswp"_n, out, tcontract, "swap:" + pair_id};
-}
-
-basic::tradeparams basic::get_pizza_trade_data(asset tokens, symbol out_sym){
-
-  sx::registry::pzaswapcntct_table pz_table( "registry.sx"_n, "registry.sx"_n.value );
-
-  auto rowit = pz_table.find(tokens.symbol.code().raw());
-  if(rowit==pz_table.end()) return {};
-  name tcontract = rowit->base.get_contract();
-  string pair_id;
-  for(auto& p: rowit->quotes){
-    if(p.first.get_symbol()==out_sym){
-      pair_id = p.second; break;
-    }
-  }
-  if(pair_id=="") return {};
-
-  // get reserves
-  const auto [ reserve_in, reserve_out ] = pizza::get_reserves( name{pair_id}.value, tokens.symbol );
-  const uint8_t fee = pizza::get_fee();
-
-  // calculate out price
-  const asset out = tokens.amount ? uniswap::get_amount_out( tokens, reserve_in, reserve_out, fee ) : asset {0, out_sym};
-
-  return {"pzaswapcntct"_n, out, tcontract, name{pair_id}.to_string()+"-swap-0"};
-}
-
-
-basic::tradeparams basic::get_swapsx_trade_data(asset tokens, symbol out_sym){
-
-  sx::registry::swap_sx_table swap_sx_table( "registry.sx"_n, "registry.sx"_n.value );
-
-  auto rowit = swap_sx_table.find(tokens.symbol.code().raw());
-  if(rowit==swap_sx_table.end()) return {};
-  name tcontract = "null"_n;
-  for(auto& p: rowit->quotes){
-    if(p.first.get_symbol()==out_sym){
-      tcontract = rowit->base.get_contract(); break;
-    }
-  }
-  if(tcontract=="null"_n) return {};
-
-  const asset out = tokens.amount? swapSx::get_amount_out( "swap.sx"_n, tokens, out_sym.code() ) : asset {0, out_sym};
-
-  return {"swap.sx"_n, out, tcontract, to.code().to_string()};
-}
-
-basic::tradeparams basic::get_stablesx_trade_data(asset tokens, symbol to){
-
-  sx::registry::stable_sx_table stable_sx_table( "registry.sx"_n, "registry.sx"_n.value );
-
-  auto rowit = stable_sx_table.find(tokens.symbol.code().raw());
-  if(rowit==stable_sx_table.end()) return {};
-  name tcontract = "null"_n;
-  for(auto& p: rowit->quotes){
-    if(p.first.get_symbol()==to){
-      tcontract = rowit->base.get_contract(); break;
-    }
-  }
-  if(tcontract=="null"_n) return {};
-
-  const asset out = tokens.amount ? swapSx::get_amount_out( "stable.sx"_n, tokens, out_sym.code() ) : asset {0, out_sym};
-
-  return {"stable.sx"_n, out, tcontract, to.code().to_string()};
-}
-
-basic::tradeparams basic::get_vigorsx_trade_data(asset tokens, symbol out_sym){
-
-  sx::registry::vigor_sx_table vigor_sx_table( "registry.sx"_n, "registry.sx"_n.value );
-
-  auto rowit = vigor_sx_table.find(tokens.symbol.code().raw());
-  if(rowit==vigor_sx_table.end()) return {};
-  name tcontract="null"_n;
-  for(auto& p: rowit->quotes){
-    if(p.first.get_symbol()==out_sym){
-      tcontract = rowit->base.get_contract(); break;
-    }
-  }
-  if(tcontract=="null"_n) return {};
-
-  const asset out = tokens.amount ? swapSx::get_amount_out( "vigor.sx"_n, tokens, to.code() ) : asset {0, out_sym};
-
-  return {"vigor.sx"_n, out, tcontract, to.code().to_string()};
-}
-
-basic::tradeparams basic::get_sapex_trade_data(asset tokens, symbol out_sym){
-
-  sx::registry::sapexamm_eo_table sapexamm_eo_table( "registry.sx"_n, "registry.sx"_n.value );
-
-  auto rowit = sapexamm_eo_table.find(tokens.symbol.code().raw());
-  if(rowit==sapexamm_eo_table.end()) return {};
-  name tcontract="null"_n;
-  for(auto& p: rowit->quotes){
-    if(p.first.get_symbol()==out_sym){
-      tcontract = rowit->base.get_contract(); break;
-    }
-  }
-  if(tcontract=="null"_n) return {};
-
-  // get reserves
-  const auto [ reserve_in, reserve_out ] = sapex::get_reserves(tokens.symbol, to);
-  const uint8_t fee = sapex::get_fee(tokens.symbol, to);
-
-  const asset out = tokens.amount ? uniswap::get_amount_out( tokens, reserve_in, reserve_out, fee ) : asset {0, out_sym};
-
-  return {"sapexamm.eo"_n, out, tcontract, to.code().to_string()};
-}
-
 template <typename T>
 vector<extended_symbol> basic::get_pairs(T& table, extended_symbol& sym){
   vector<extended_symbol> res;
@@ -314,24 +165,6 @@ map<string, vector<extended_symbol>> basic::get_all_pairs(extended_symbol sym){
 
   sx::registry::defisswapcnt_table dfs_table( "registry.sx"_n, "registry.sx"_n.value );
   res["dfs"] = get_pairs(dfs_table, sym);
-
-  sx::registry::hamburgerswp_table hbg_table( "registry.sx"_n, "registry.sx"_n.value );
-  res["hamburger"] = get_pairs(hbg_table, sym);
-
-  sx::registry::pzaswapcntct_table pz_table( "registry.sx"_n, "registry.sx"_n.value );
-  res["pizza"] = get_pairs(pz_table, sym);
-
-  sx::registry::swap_sx_table swap_sx_table( "registry.sx"_n, "registry.sx"_n.value );
-  res["swap.sx"] = get_pairs(swap_sx_table, sym);
-
-  sx::registry::vigor_sx_table vigor_sx_table( "registry.sx"_n, "registry.sx"_n.value );
-  res["vigor.sx"] = get_pairs(vigor_sx_table, sym);
-
-  sx::registry::stable_sx_table stable_sx_table( "registry.sx"_n, "registry.sx"_n.value );
-  res["stable.sx"] = get_pairs(stable_sx_table, sym);
-
-  sx::registry::sapexamm_eo_table sapex_table( "registry.sx"_n, "registry.sx"_n.value );
-  res["sapex"] = get_pairs(sapex_table, sym);
 
   return res;
 }
